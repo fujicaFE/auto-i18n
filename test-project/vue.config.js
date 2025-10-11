@@ -3,8 +3,63 @@ const AutoI18nPlugin = require('../lib/index.js')
 module.exports = {
   transpileDependencies: [],
   
+  chainWebpack: config => {
+    const isDevelopment = process.env.NODE_ENV === 'development'
+    const DEV_I18N_MODE = process.env.DEV_I18N_MODE || 'hardcoded'
+    const cleanDEV_I18N_MODE = DEV_I18N_MODE ? DEV_I18N_MODE.trim() : 'hardcoded'
+    
+    // 如果启用内存转换，添加我们的loader - 用最简单的方式
+    if (isDevelopment && cleanDEV_I18N_MODE === 'i18n') {
+      const loaderPath = require.resolve('../lib/auto-i18n-loader.js')
+      console.log('ChainWebpack: Adding simple loader at:', loaderPath)
+      
+      // 直接为Vue文件添加我们的loader
+      config.module
+        .rule('auto-i18n-transform')
+        .test(/\.vue$/)
+        .exclude.add(/node_modules/).end()
+        .use('auto-i18n-transform-loader')
+        .loader(loaderPath)
+        .options({
+          memoryTransformOnly: true,
+          functionName: '$t',
+          outputPath: './src/locales'
+        })
+        .end()
+    }
+  },
+  
   configureWebpack: (config) => {
     const isProduction = process.env.NODE_ENV === 'production'
+    const isDevelopment = process.env.NODE_ENV === 'development'
+    
+    // 添加环境变量来控制开发模式的行为
+    // 使用方法：DEV_I18N_MODE=i18n npm run serve
+    const DEV_I18N_MODE = process.env.DEV_I18N_MODE || 'hardcoded' // 'hardcoded' | 'i18n'
+    
+    console.log(`AutoI18n Config: Production=${isProduction}, DEV_I18N_MODE=${DEV_I18N_MODE}`)
+    console.log(`AutoI18n Config: isDevelopment=${isDevelopment}`)
+    console.log(`AutoI18n Config: DEV_I18N_MODE length=${DEV_I18N_MODE ? DEV_I18N_MODE.length : 'undefined'}`)
+    console.log(`AutoI18n Config: DEV_I18N_MODE JSON=${JSON.stringify(DEV_I18N_MODE)}`)
+    console.log(`AutoI18n Config: DEV_I18N_MODE === 'i18n' is ${DEV_I18N_MODE === 'i18n'}`)
+    console.log(`AutoI18n Config: (isDevelopment && DEV_I18N_MODE === 'i18n') is ${isDevelopment && DEV_I18N_MODE === 'i18n'}`)
+    
+    // 尝试修复：去除可能的空格和换行符
+    const cleanDEV_I18N_MODE = DEV_I18N_MODE ? DEV_I18N_MODE.trim() : 'hardcoded'
+    console.log(`AutoI18n Config: cleanDEV_I18N_MODE=${cleanDEV_I18N_MODE}`)
+    console.log(`AutoI18n Config: cleanDEV_I18N_MODE === 'i18n' is ${cleanDEV_I18N_MODE === 'i18n'}`)
+    
+    console.log(`AutoI18n Config: transformCode=${isProduction || (isDevelopment && cleanDEV_I18N_MODE === 'i18n')}`)
+    console.log(`AutoI18n Config: memoryTransformOnly=${isDevelopment && cleanDEV_I18N_MODE === 'i18n'}`)
+    
+    // 开发环境的特殊配置
+    if (isDevelopment && cleanDEV_I18N_MODE === 'i18n') {
+      // 当启用 i18n 模式时，禁用热更新避免冲突
+      if (config.devServer) {
+        config.devServer.liveReload = false
+        config.devServer.hot = false
+      }
+    }
     
     return {
       plugins: [
@@ -12,7 +67,10 @@ module.exports = {
           outputPath: './src/locales',
           apiProvider: 'preset',
           targetLanguages: ['en', 'zh-TW', 'ja'],
-          transformCode: isProduction, // 只在生产模式下转换代码
+          // 关键配置：根据环境和模式决定是否转换代码
+          transformCode: isProduction || (isDevelopment && cleanDEV_I18N_MODE === 'i18n'),
+          // 新增选项：开发环境是否只在内存中转换（不修改源文件）
+          memoryTransformOnly: isDevelopment && cleanDEV_I18N_MODE === 'i18n',
           presets: {
           '你好': { en: 'Hello', 'zh-TW': '你好', ja: 'こんにちは' },
           '世界': { en: 'World', 'zh-TW': '世界', ja: '世界' },
@@ -39,7 +97,6 @@ module.exports = {
           '操作成功': { en: 'Operation Successful', 'zh-TW': '操作成功', ja: '操作成功' },
           '操作失败': { en: 'Operation Failed', 'zh-TW': '操作失敗', ja: '操作失敗' }
         },
-        transformCode: isProduction,
         ignoreComments: true,
         exclude: ['/node_modules/', /\.min\.js$/]
       })

@@ -4,6 +4,7 @@
   "description": "Test project for auto-i18n webpack plugin",
   "scripts": {
     "serve": "set NODE_OPTIONS=--max-old-space-size=8192 && vue-cli-service serve",
+    "serve:i18n": "set NODE_OPTIONS=--max-old-space-size=8192 && set DEV_I18N_MODE=i18n && vue-cli-service serve",
     "build": "vue-cli-service build",
     "test:plugin": "npm run build && echo 'Plugin test completed'"
   },

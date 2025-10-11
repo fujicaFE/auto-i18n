@@ -85,6 +85,15 @@ class AutoI18nPlugin {
 
     // 在编译开始前处理源文件，而不是处理编译后的资产
     compiler.hooks.compilation.tap('AutoI18nPlugin', (compilation: any) => {
+      // 调试输出
+      console.log('AutoI18nPlugin: transformCode =', this.options.transformCode)
+      console.log('AutoI18nPlugin: memoryTransformOnly =', this.options.memoryTransformOnly)
+      
+      // 内存转换现在通过chainWebpack处理，不在插件内部处理
+      // if (this.options.transformCode && this.options.memoryTransformOnly) {
+      //   this.addTransformLoader(compiler)
+      // }
+
       // 使用 buildModule 钩子处理每个模块
       compilation.hooks.buildModule.tap('AutoI18nPlugin', (module: any) => {
         // 只处理用户源文件，忽略 node_modules
@@ -184,6 +193,84 @@ class AutoI18nPlugin {
     } else {
       console.log('AutoI18nPlugin: No new Chinese texts found in source files')
     }
+  }
+
+  private addTransformLoader(compiler: any) {
+    console.log('AutoI18nPlugin: Adding memory transform loader (simplified)')
+    
+    // 使用 webpack 的 normalModuleFactory 钩子直接处理模块
+    compiler.hooks.normalModuleFactory.tap('AutoI18nPlugin', (factory: any) => {
+      factory.hooks.afterResolve.tap('AutoI18nPlugin', (resolveData: any) => {
+        const resource = resolveData.resource
+        
+        // 只处理我们关心的文件
+        if (resource && this.shouldTransformFile(resource)) {
+          console.log('AutoI18nPlugin: Intercepting resource:', path.basename(resource))
+          
+          // 添加我们的 loader 到 loaders 链的最后
+          if (!resolveData.loaders) {
+            resolveData.loaders = []
+          }
+          
+          resolveData.loaders.push({
+            loader: path.join(__dirname, 'auto-i18n-loader.js'),
+            options: {
+              memoryTransformOnly: true,
+              functionName: '$t',
+              outputPath: this.options.outputPath
+            }
+          })
+        }
+      })
+    })
+    
+    console.log('AutoI18nPlugin: Memory transform loader registered')
+  }
+
+  private shouldTransformFile(resource: string): boolean {
+    if (!resource) return false
+    if (resource.includes('node_modules')) return false
+    
+    const ext = path.extname(resource).toLowerCase()
+    return ['.vue', '.js', '.ts'].includes(ext)
+  }
+
+  private loadTranslationsFromMemory(): { [key: string]: { [locale: string]: string } } {
+    const translations: { [key: string]: { [locale: string]: string } } = {}
+    
+    try {
+      const fs = require('fs')
+      const localesDir = path.resolve(this.options.outputPath)
+      
+      if (!fs.existsSync(localesDir)) {
+        return translations
+      }
+
+      const files = fs.readdirSync(localesDir).filter((file: string) => file.endsWith('.json'))
+      
+      for (const file of files) {
+        const locale = path.basename(file, '.json')
+        const filePath = path.join(localesDir, file)
+        
+        try {
+          const content = fs.readFileSync(filePath, 'utf-8')
+          const localeTranslations = JSON.parse(content)
+          
+          for (const [key, translation] of Object.entries(localeTranslations)) {
+            if (!translations[key]) {
+              translations[key] = {}
+            }
+            translations[key][locale] = translation as string
+          }
+        } catch (error) {
+          console.warn('AutoI18nPlugin: Failed to load', filePath)
+        }
+      }
+    } catch (error) {
+      console.warn('AutoI18nPlugin: Failed to load translations:', error.message)
+    }
+
+    return translations
   }
 }
 

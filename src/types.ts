@@ -50,6 +50,13 @@ export interface AutoI18nPluginOptions {
    * @default true
    */
   transformCode?: boolean
+
+  /**
+   * 是否只在内存中转换代码（不修改源文件）
+   * 主要用于开发环境，既能体验国际化效果又保持源代码干净
+   * @default false
+   */
+  memoryTransformOnly?: boolean
 }
 
 export interface Translation {

@@ -3,6 +3,7 @@
     <nav class="navbar">
       <div class="nav-container">
         <h1 class="nav-title">自动国际化测试项目</h1>
+                <!-- 测试修改触发重编译 v11 -->
         <div class="nav-links">
           <router-link to="/" class="nav-link">首页</router-link>
           <router-link to="/about" class="nav-link">关于</router-link>

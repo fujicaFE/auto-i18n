@@ -1,5 +1,8 @@
 <template>
   <div class="home">
+    <!-- 添加国际化测试组件 -->
+    <I18nTest />
+    
     <div class="hero-section">
       <h1 class="hero-title">欢迎使用自动国际化插件</h1>
       <p class="hero-subtitle">这是一个演示项目，展示webpack插件如何自动提取和翻译中文文本</p>
@@ -59,11 +62,13 @@
 
 <script>
 import DemoComponent from '@/components/DemoComponent.vue'
+import I18nTest from '@/components/I18nTest.vue'
 
 export default {
   name: 'Home',
   components: {
-    DemoComponent
+    DemoComponent,
+    I18nTest
   },
   data() {
     return {
