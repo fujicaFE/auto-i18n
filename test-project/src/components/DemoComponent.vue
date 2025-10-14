@@ -1,71 +1,70 @@
 <template>
   <div class="demo-component">
-    <h3>演示组件</h3>
-    <p>这是一个包含中文文本的演示组件，用于测试自动国际化功能。</p>
+    <h3>{{ $t('演示组件') }}</h3>
+    <p>{{ $t('这是一个包含中文文本的演示组件，用于测试自动国际化功能。') }}</p>
     
     <div class="demo-content">
       <div class="text-examples">
-        <h4>文本示例</h4>
+        <h4>{{ $t('文本示例') }}</h4>
         <p>{{ message }}</p>
         <p>当前时间: {{ currentTime }}</p>
         <p>{{ getGreeting() }}</p>
       </div>
       
       <div class="button-examples">
-        <h4>按钮示例</h4>
-        <button @click="handleClick('保存')">保存</button>
-        <button @click="handleClick('删除')">删除</button>
-        <button @click="handleClick('取消')">取消</button>
+        <h4>{{ $t('按钮示例') }}</h4>
+        <button @click="handleClick('保存')">{{ $t('保存') }}</button>
+        <button @click="handleClick('删除')">{{ $t('删除') }}</button>
+        <button @click="handleClick('取消')">{{ $t('取消') }}</button>
       </div>
       
       <div class="input-examples">
-        <h4>输入框示例</h4>
-        <input v-model="inputValue" placeholder="请输入内容" />
+        <h4>{{ $t('输入框示例') }}</h4>
+        <input v-model="inputValue" :placeholder="$t('请输入内容')" />
         <p v-if="inputValue">您输入的内容: {{ inputValue }}</p>
       </div>
     </div>
   </div>
 </template>
 
-<script>
+<script>import { useI18n } from 'vue-i18n';
 export default {
   name: 'DemoComponent',
   data() {
     return {
-      message: '这是一个测试消息',
+      message: this.$t("这是一个测试消息"),
       currentTime: '',
       inputValue: ''
-    }
+    };
   },
   methods: {
     handleClick(action) {
-      alert(`您点击了: ${action}`)
-      console.log('按钮操作:', action)
+      alert(`您点击了: ${action}`);
+      console.log(this.$t("按钮操作:"), action);
     },
     getGreeting() {
-      const hour = new Date().getHours()
+      const hour = new Date().getHours();
       if (hour < 12) {
-        return '早上好！'
+        return this.$t("早上好！");
       } else if (hour < 18) {
-        return '下午好！'
+        return this.$t("下午好！");
       } else {
-        return '晚上好！'
+        return this.$t("晚上好！");
       }
     },
     updateTime() {
-      this.currentTime = new Date().toLocaleString('zh-CN')
+      this.currentTime = new Date().toLocaleString('zh-CN');
     }
   },
   mounted() {
-    console.log('演示组件已挂载')
-    this.updateTime()
-    setInterval(this.updateTime, 1000)
+    console.log(this.$t("演示组件已挂载"));
+    this.updateTime();
+    setInterval(this.updateTime, 1000);
   },
   beforeDestroy() {
-    console.log('演示组件即将销毁')
+    console.log(this.$t("演示组件即将销毁"));
   }
-}
-</script>
+};</script>
 
 <style scoped>
 .demo-component {

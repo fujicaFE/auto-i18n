@@ -1,85 +1,83 @@
 <template>
   <div class="about">
     <div class="about-header">
-      <h1>关于自动国际化插件</h1>
-      <p class="about-subtitle">了解这个强大的webpack插件如何简化你的国际化工作流程</p>
+      <h1>{{ $t('关于自动国际化插件') }}</h1>
+      <p class="about-subtitle">{{ $t('了解这个强大的webpack插件如何简化你的国际化工作流程') }}</p>
     </div>
 
     <div class="about-content">
       <section class="intro-section">
-        <h2>项目介绍</h2>
-        <p>
-          自动国际化插件是一个专为Vue.js项目设计的webpack插件，它能够自动识别代码中的中文文本， 并将其提取、翻译和转换为标准的i18n格式。这大大简化了国际化的工作流程， 让开发者可以专注于业务逻辑而不是繁琐的翻译工作。
-        </p>
+        <h2>{{ $t('项目介绍') }}</h2>
+        <p>{{ $t('自动国际化插件是一个专为Vue.js项目设计的webpack插件，它能够自动识别代码中的中文文本， 并将其提取、翻译和转换为标准的i18n格式。这大大简化了国际化的工作流程， 让开发者可以专注于业务逻辑而不是繁琐的翻译工作。') }}</p>
       </section>
 
       <section class="features-section">
-        <h2>核心功能</h2>
+        <h2>{{ $t('核心功能') }}</h2>
         <div class="features-list">
           <div class="feature-item">
-            <h3>智能文本识别</h3>
-            <p>自动识别Vue组件模板、脚本和JavaScript文件中的中文文本</p>
+            <h3>{{ $t('智能文本识别') }}</h3>
+            <p>{{ $t('自动识别Vue组件模板、脚本和JavaScript文件中的中文文本') }}</p>
           </div>
           <div class="feature-item">
-            <h3>多译翻译支持</h3>
-            <p>集成百度翻译、谷歌翻译等多种翻译服务</p>
+            <h3>{{ $t('多译翻译支持') }}</h3>
+            <p>{{ $t('集成百度翻译、谷歌翻译等多种翻译服务') }}</p>
           </div>
           <div class="feature-item">
-            <h3>代码自动转换</h3>
+            <h3>{{ $t('代码自动转换') }}</h3>
             <p>将中文字符串自动替换为$t()函数调用</p>
           </div>
           <div class="feature-item">
-            <h3>预设翻译管理</h3>
-            <p>支持预定义翻译词汇，确保翻译质量</p>
+            <h3>{{ $t('预设翻译管理') }}</h3>
+            <p>{{ $t('支持预定义翻译词汇，确保翻译质量') }}</p>
           </div>
         </div>
       </section>
 
       <section class="usage-section">
-        <h2>使用说明</h2>
+        <h2>{{ $t('使用说明') }}</h2>
         <div class="usage-steps">
           <div class="step">
             <div class="step-number">1</div>
             <div class="step-content">
-              <h3>安装插件</h3>
+              <h3>{{ $t('安装插件') }}</h3>
               <code>npm install @fujica/auto-i18n --save-dev</code>
             </div>
           </div>
           <div class="step">
             <div class="step-number">2</div>
             <div class="step-content">
-              <h3>配置webpack</h3>
-              <p>在vue.config.js中添加插件配置</p>
+              <h3>{{ $t('配置webpack') }}</h3>
+              <p>{{ $t('在vue.config.js中添加插件配置') }}</p>
             </div>
           </div>
           <div class="step">
             <div class="step-number">3</div>
             <div class="step-content">
-              <h3>运行构建</h3>
-              <p>执行构建命令，插件会自动处理国际化</p>
+              <h3>{{ $t('运行构建') }}</h3>
+              <p>{{ $t('执行构建命令，插件会自动处理国际化') }}</p>
             </div>
           </div>
         </div>
       </section>
 
       <section class="stats-section">
-        <h2>项目统计</h2>
+        <h2>{{ $t('项目统计') }}</h2>
         <div class="stats-grid">
           <div class="stat-item">
             <div class="stat-number">{{ stats.filesProcessed }}</div>
-            <div class="stat-label">处理文件数</div>
+            <div class="stat-label">{{ $t('处理文件数') }}</div>
           </div>
           <div class="stat-item">
             <div class="stat-number">{{ stats.textsExtracted }}</div>
-            <div class="stat-label">提取文本数</div>
+            <div class="stat-label">{{ $t('提取文本数') }}</div>
           </div>
           <div class="stat-item">
             <div class="stat-number">{{ stats.languagesSupported }}</div>
-            <div class="stat-label">支持语言数</div>
+            <div class="stat-label">{{ $t('支持语言数') }}</div>
           </div>
           <div class="stat-item">
             <div class="stat-number">{{ stats.translationTime }}</div>
-            <div class="stat-label">平均翻译时间(ms)</div>
+            <div class="stat-label">{{ $t('平均翻译时间(ms)') }}</div>
           </div>
         </div>
       </section>
@@ -87,7 +85,7 @@
   </div>
 </template>
 
-<script>
+<script>import { useI18n } from 'vue-i18n';
 export default {
   name: 'About',
   data() {
@@ -98,51 +96,50 @@ export default {
         languagesSupported: 3,
         translationTime: 0
       }
-    }
+    };
   },
   methods: {
     loadStats() {
       // 模拟加载统计数据
-      console.log('正在加载项目统计数据...')
-      
+      console.log(this.$t("正在加载项目统计数据..."));
+
       const targets = {
         filesProcessed: 42,
         textsExtracted: 156,
         translationTime: 250
-      }
-      
-      Object.keys(targets).forEach(key => {
-        this.animateNumber(key, targets[key])
-      })
+      };
+
+      Object.keys(targets).forEach((key) => {
+        this.animateNumber(key, targets[key]);
+      });
     },
     animateNumber(key, target) {
-      const duration = 2000
-      const start = 0
-      const startTime = performance.now()
-      
+      const duration = 2000;
+      const start = 0;
+      const startTime = performance.now();
+
       const animate = (currentTime) => {
-        const elapsed = currentTime - startTime
-        const progress = Math.min(elapsed / duration, 1)
-        
-        this.stats[key] = Math.floor(start + (target - start) * progress)
-        
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+
+        this.stats[key] = Math.floor(start + (target - start) * progress);
+
         if (progress < 1) {
-          requestAnimationFrame(animate)
+          requestAnimationFrame(animate);
         }
-      }
-      
-      requestAnimationFrame(animate)
+      };
+
+      requestAnimationFrame(animate);
     },
     showTechDetails() {
-      alert('技术详情：基于Babel AST解析，支持Vue SFC和JavaScript文件处理')
+      alert(this.$t("技术详情：基于Babel AST解析，支持Vue SFC和JavaScript文件处理"));
     }
   },
   mounted() {
-    console.log('关于页面已加载')
-    this.loadStats()
+    console.log(this.$t("关于页面已加载"));
+    this.loadStats();
   }
-}
-</script>
+};</script>
 
 <style scoped>
 .about {

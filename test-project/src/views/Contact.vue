@@ -1,117 +1,116 @@
 <template>
   <div class="contact">
     <div class="contact-header">
-      <h1>联系我们</h1>
-      <p>如果您有任何问题或建议，请随时与我们联系</p>
+      <h1>{{ $t('联系我们') }}</h1>
+      <p>{{ $t('如果您有任何问题或建议，请随时与我们联系') }}</p>
     </div>
 
     <div class="contact-content">
       <div class="contact-form">
-        <h2>发送消息</h2>
+        <h2>{{ $t('发送消息') }}</h2>
         <form @submit.prevent="handleSubmit">
           <div class="form-group">
-            <label for="name">姓名 *</label>
+            <label for="name">{{ $t('姓名 *') }}</label>
             <input
               type="text"
               id="name"
               v-model="form.name"
               required
-              placeholder="请输入您的姓名"
+              :placeholder="$t('请输入您的姓名')"
             >
           </div>
           
           <div class="form-group">
-            <label for="email">邮箱 *</label>
+            <label for="email">{{ $t('邮箱 *') }}</label>
             <input
               type="email"
               id="email"
               v-model="form.email"
               required
-              placeholder="请输入您的邮箱地址"
+              :placeholder="$t('请输入您的邮箱地址')"
             >
           </div>
           
           <div class="form-group">
-            <label for="subject">主题</label>
+            <label for="subject">{{ $t('主题') }}</label>
             <select id="subject" v-model="form.subject">
-              <option value="">请选择主题</option>
-              <option value="bug">错误报告</option>
-              <option value="feature">功能建议</option>
-              <option value="question">使用问题</option>
-              <option value="other">其他</option>
+              <option value="">{{ $t('请选择主题') }}</option>
+              <option value="bug">{{ $t('错误报告') }}</option>
+              <option value="feature">{{ $t('功能建议') }}</option>
+              <option value="question">{{ $t('使用问题') }}</option>
+              <option value="other">{{ $t('其他') }}</option>
             </select>
           </div>
           
           <div class="form-group">
-            <label for="message">消息内容 *</label>
+            <label for="message">{{ $t('消息内容 *') }}</label>
             <textarea
               id="message"
               v-model="form.message"
               rows="5"
               required
-              placeholder="请详细描述您的问题或建议..."
+              :placeholder="$t('请详细描述您的问题或建议...')"
             ></textarea>
           </div>
           
           <div class="form-actions">
             <button type="submit" class="submit-btn" :disabled="isSubmitting">
-              {{ isSubmitting ? '发送中...' : '发送消息' }}
+              {{  isSubmitting ? $t('发送中...') : '发送消息'  }}
             </button>
-            <button type="button" @click="resetForm" class="reset-btn">重置表单</button>
+            <button type="button" @click="resetForm" class="reset-btn">{{ $t('重置表单') }}</button>
           </div>
         </form>
       </div>
 
       <div class="contact-info">
-        <h2>联系信息</h2>
+        <h2>{{ $t('联系信息') }}</h2>
         
         <div class="info-section">
-          <h3>开发者信息</h3>
+          <h3>{{ $t('开发者信息') }}</h3>
           <div class="info-item">
-            <strong>项目名称:</strong> 自动国际化插件
+            <strong>{{ $t('项目名称:') }}</strong>{{ $t('自动国际化插件') }}</div>
+          <div class="info-item">
+            <strong>{{ $t('开发者:') }}</strong> Fujica
           </div>
           <div class="info-item">
-            <strong>开发者:</strong> Fujica
-          </div>
-          <div class="info-item">
-            <strong>版本:</strong> v1.0.0
-          </div>
-        </div>
-
-        <div class="info-section">
-          <h3>技术支持</h3>
-          <div class="info-item">
-            <strong>文档:</strong> <a href="#" @click="openDocs">查看文档</a>
-          </div>
-          <div class="info-item">
-            <strong>GitHub:</strong> <a href="#" @click="openGithub">访问仓库</a>
-          </div>
-          <div class="info-item">
-            <strong>问题反馈:</strong> <a href="#" @click="openIssues">提交Issue</a>
+            <strong>{{ $t('版本:') }}</strong> v1.0.0
           </div>
         </div>
 
         <div class="info-section">
-          <h3>快速链接</h3>
+          <h3>{{ $t('技术支持') }}</h3>
+          <div class="info-item">
+            <strong>{{ $t('文档:') }}</strong> <a href="#" @click="openDocs">{{ $t('查看文档') }}</a>
+          </div>
+          <div class="info-item">
+            <strong>GitHub:</strong> <a href="#" @click="openGithub">{{ $t('访问仓库') }}</a>
+          </div>
+          <div class="info-item">
+            <strong>{{ $t('问题反馈:') }}</strong> <a href="#" @click="openIssues">{{ $t('提交Issue') }}</a>
+          </div>
+        </div>
+
+        <div class="info-section">
+          <h3>{{ $t('快速链接') }}</h3>
           <div class="quick-links">
-            <button @click="showFAQ" class="link-btn">常见问题</button>
-            <button @click="showTutorial" class="link-btn">使用教程</button>
-            <button @click="showExamples" class="link-btn">示例代码</button>
+            <button @click="showFAQ" class="link-btn">{{ $t('常见问题') }}</button>
+            <button @click="showTutorial" class="link-btn">{{ $t('使用教程') }}</button>
+            <button @click="showExamples" class="link-btn">{{ $t('示例代码') }}</button>
           </div>
         </div>
       </div>
     </div>
-
+    
     <!-- 成功提示 -->
     <div v-if="showSuccess" class="success-message">
-      <h3>消息发送成功！</h3>
-      <p>感谢您的反馈，我们会尽快回复您。</p>
-      <button @click="showSuccess = false">关闭</button>
+      <h3>{{ $t('消息发送成功！') }}</h3>
+      <p>{{ $t('感谢您的反馈，我们会尽快回复您。') }}</p>
+      <button @click="showSuccess = false">{{ $t('关闭') }}</button>
     </div>
   </div>
 </template>
 
-<script>
+<script>import { useI18n } from 'vue-i18n';
 export default {
   name: 'Contact',
   data() {
@@ -124,112 +123,111 @@ export default {
       },
       isSubmitting: false,
       showSuccess: false
-    }
+    };
   },
   methods: {
     async handleSubmit() {
       if (!this.validateForm()) {
-        return
+        return;
       }
-      
-      this.isSubmitting = true
-      console.log('正在发送消息...', this.form)
-      
+
+      this.isSubmitting = true;
+      console.log(this.$t("正在发送消息..."), this.form);
+
       try {
         // 模拟发送消息
-        await this.simulateSubmission()
-        this.showSuccess = true
-        this.resetForm()
-        alert('消息发送成功！谢谢您的反馈。')
+        await this.simulateSubmission();
+        this.showSuccess = true;
+        this.resetForm();
+        alert(this.$t("消息发送成功！谢谢您的反馈。"));
       } catch (error) {
-        alert('发送失败，请稍后重试。')
-        console.error('发送错误:', error)
+        alert(this.$t("发送失败，请稍后重试。"));
+        console.error(this.$t("发送错误:"), error);
       } finally {
-        this.isSubmitting = false
+        this.isSubmitting = false;
       }
     },
-    
+
     validateForm() {
       if (!this.form.name.trim()) {
-        alert('请输入您的姓名')
-        return false
+        alert(this.$t("请输入您的姓名"));
+        return false;
       }
-      
+
       if (!this.form.email.trim()) {
-        alert('请输入您的邮箱地址')
-        return false
+        alert(this.$t("请输入您的邮箱地址"));
+        return false;
       }
-      
+
       if (!this.isValidEmail(this.form.email)) {
-        alert('请输入有效的邮箱地址')
-        return false
+        alert(this.$t("请输入有效的邮箱地址"));
+        return false;
       }
-      
+
       if (!this.form.message.trim()) {
-        alert('请输入消息内容')
-        return false
+        alert(this.$t("请输入消息内容"));
+        return false;
       }
-      
-      return true
+
+      return true;
     },
-    
+
     isValidEmail(email) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      return emailRegex.test(email)
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      return emailRegex.test(email);
     },
-    
+
     resetForm() {
       this.form = {
         name: '',
         email: '',
         subject: '',
         message: ''
-      }
-      console.log('表单已重置')
+      };
+      console.log(this.$t("表单已重置"));
     },
-    
+
     simulateSubmission() {
       return new Promise((resolve) => {
         setTimeout(() => {
-          console.log('消息发送模拟完成')
-          resolve()
-        }, 2000)
-      })
+          console.log(this.$t("消息发送模拟完成"));
+          resolve();
+        }, 2000);
+      });
     },
-    
+
     openDocs() {
-      alert('即将跳转到文档页面...')
-      console.log('打开文档')
+      alert(this.$t("即将跳转到文档页面..."));
+      console.log(this.$t("打开文档"));
     },
-    
+
     openGithub() {
-      alert('即将跳转到GitHub仓库...')
-      console.log('打开GitHub')
+      alert(this.$t("即将跳转到GitHub仓库..."));
+      console.log(this.$t("打开GitHub"));
     },
-    
+
     openIssues() {
-      alert('即将跳转到Issues页面...')
-      console.log('打开Issues')
+      alert(this.$t("即将跳转到Issues页面..."));
+      console.log(this.$t("打开Issues"));
     },
-    
+
     showFAQ() {
-      alert('常见问题页面开发中...')
+      alert(this.$t("常见问题页面开发中..."));
     },
-    
+
     showTutorial() {
-      alert('使用教程页面开发中...')
+      alert(this.$t("使用教程页面开发中..."));
     },
-    
+
     showExamples() {
-      alert('示例代码页面开发中...')
+      alert(this.$t("示例代码页面开发中..."));
     }
   },
-  
+
   mounted() {
-    console.log('联系页面已加载')
+    console.log(this.$t("联系页面已加载"));
   }
-}
-</script>
+};</script>
 
 <style scoped>
 .contact {

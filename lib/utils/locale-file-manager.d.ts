@@ -2,8 +2,9 @@ import { Translation } from '../types';
 export declare class LocaleFileManager {
     private outputPath;
     private locales;
+    private sourceLanguage;
     private translations;
-    constructor(outputPath: string, locales?: string[]);
+    constructor(outputPath: string, locales?: string[], sourceLanguage?: string);
     /**
      * 检查是否有翻译
      */

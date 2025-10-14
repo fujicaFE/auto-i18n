@@ -2,7 +2,9 @@ import path from 'path'
 import { ChineseExtractor } from './utils/chinese-extractor'
 import { TranslationService } from './utils/translation-service'
 import { LocaleFileManager } from './utils/locale-file-manager'
-import { transform } from './transformer'
+import { RenderDetector } from './utils/render-detector'
+import { CodeAnalyzer } from './utils/code-analyzer'
+import { FilePreprocessor } from './utils/file-preprocessor'
 import { AutoI18nPluginOptions, Translation } from './types'
 
 // 内置 RawSource 实现，避免依赖 webpack-sources
@@ -27,6 +29,9 @@ class AutoI18nPlugin {
   translationService: TranslationService
   localeFileManager: LocaleFileManager
   chineseExtractor: ChineseExtractor
+  renderDetector: RenderDetector
+  codeAnalyzer: CodeAnalyzer
+  filePreprocessor: FilePreprocessor
   private processedTexts: Set<string> = new Set()
   private isDevMode: boolean = false
   private compilationCount: number = 0
@@ -44,21 +49,34 @@ class AutoI18nPlugin {
       ...options
     }
 
+    // 确保targetLanguages包含sourceLanguage
+    const sourceLanguage = this.options.sourceLanguage || 'zh'
+    const targetLanguages = this.options.targetLanguages || ['en', 'zh-TW']
+    if (!targetLanguages.includes(sourceLanguage)) {
+      targetLanguages.unshift(sourceLanguage)
+    }
+
     this.translationService = new TranslationService({
       apiKey: this.options.apiKey,
       apiProvider: this.options.apiProvider,
-      sourceLanguage: this.options.sourceLanguage,
-      targetLanguages: this.options.targetLanguages,
+      sourceLanguage: sourceLanguage,
+      targetLanguages: targetLanguages,
       presets: this.options.presets || {}
     })
 
     this.localeFileManager = new LocaleFileManager(
       this.options.outputPath || './src/locales',
-      this.options.targetLanguages || ['en', 'zh-TW']
+      targetLanguages,
+      sourceLanguage
     )
     this.chineseExtractor = new ChineseExtractor({
       ignoreComments: this.options.ignoreComments
     })
+    
+    // 初始化新的工具类
+    this.renderDetector = new RenderDetector()
+    this.codeAnalyzer = new CodeAnalyzer()
+    this.filePreprocessor = new FilePreprocessor(this.chineseExtractor)
   }
 
   apply(compiler: any) {
@@ -85,14 +103,6 @@ class AutoI18nPlugin {
 
     // 在编译开始前处理源文件，而不是处理编译后的资产
     compiler.hooks.compilation.tap('AutoI18nPlugin', (compilation: any) => {
-      // 调试输出
-      console.log('AutoI18nPlugin: transformCode =', this.options.transformCode)
-      console.log('AutoI18nPlugin: memoryTransformOnly =', this.options.memoryTransformOnly)
-      
-      // 内存转换现在通过chainWebpack处理，不在插件内部处理
-      // if (this.options.transformCode && this.options.memoryTransformOnly) {
-      //   this.addTransformLoader(compiler)
-      // }
 
       // 使用 buildModule 钩子处理每个模块
       compilation.hooks.buildModule.tap('AutoI18nPlugin', (module: any) => {
@@ -115,6 +125,22 @@ class AutoI18nPlugin {
       })
     })
 
+    // 🔥 新增：在编译开始前直接预处理Vue文件
+    if (this.options.transformCode) {
+      compiler.hooks.beforeCompile.tapAsync('AutoI18nPlugin', async (params: any, callback: Function) => {
+        console.log('🚀 AutoI18nPlugin: beforeCompile - 开始直接预处理Vue文件')
+        
+        try {
+          await this.filePreprocessor.processVueFilesDirectly(this.options.outputPath)
+          console.log('✅ AutoI18nPlugin: Vue文件直接预处理完成')
+        } catch (error) {
+          console.error('❌ AutoI18nPlugin: Vue文件预处理失败:', error)
+        }
+        
+        callback()
+      })
+    }
+
     // 在开发模式下，当编译完成时可以选择性保存翻译文件
     if (this.isDevMode) {
       compiler.hooks.done.tap('AutoI18nPlugin', () => {
@@ -124,6 +150,44 @@ class AutoI18nPlugin {
         }
       })
     }
+
+    // 使用emit钩子来捕获最终生成的代码，包括Vue的render函数
+    compiler.hooks.emit.tap('AutoI18nPlugin', (compilation: any) => {
+      console.log('🎯 AutoI18nPlugin: emit钩子 - 开始分析最终生成的资产')
+      
+      const translations = this.loadTranslationsFromMemory();
+      
+      // 遍历所有生成的资产
+      for (const [filename, asset] of Object.entries(compilation.assets)) {
+        // 只处理JavaScript文件
+        if (filename.endsWith('.js')) {
+          console.log(`📄 AutoI18nPlugin: 分析JavaScript资产 - ${filename}`)
+          
+          // 获取资产的源代码
+          const source = (asset as any).source();
+          
+          if (typeof source === 'string') {
+            // 检查是否包含Vue render函数的特征
+            const renderResult = this.renderDetector.checkForRenderInEmittedCode(source);
+            
+            if (renderResult.hasRenderFunction) {
+              console.log(`🎨 AutoI18nPlugin: 在 ${filename} 中发现render函数！`)
+              
+              // 检查render函数中是否包含中文
+              const chineseRegex = /[\u4e00-\u9fff]/;
+              if (chineseRegex.test(source)) {
+                console.log(`🈚 AutoI18nPlugin: ${filename} 中的render函数包含中文文本！`)
+                
+                // 在这里我们可以进行处理
+                this.codeAnalyzer.processRenderFunctionInEmit(source, filename, translations);
+              }
+            }
+          }
+        }
+      }
+      
+      console.log('✅ AutoI18nPlugin: emit钩子分析完成')
+    });
   }
 
   private async processSourceFile(filePath: string) {
@@ -195,46 +259,6 @@ class AutoI18nPlugin {
     }
   }
 
-  private addTransformLoader(compiler: any) {
-    console.log('AutoI18nPlugin: Adding memory transform loader (simplified)')
-    
-    // 使用 webpack 的 normalModuleFactory 钩子直接处理模块
-    compiler.hooks.normalModuleFactory.tap('AutoI18nPlugin', (factory: any) => {
-      factory.hooks.afterResolve.tap('AutoI18nPlugin', (resolveData: any) => {
-        const resource = resolveData.resource
-        
-        // 只处理我们关心的文件
-        if (resource && this.shouldTransformFile(resource)) {
-          console.log('AutoI18nPlugin: Intercepting resource:', path.basename(resource))
-          
-          // 添加我们的 loader 到 loaders 链的最后
-          if (!resolveData.loaders) {
-            resolveData.loaders = []
-          }
-          
-          resolveData.loaders.push({
-            loader: path.join(__dirname, 'auto-i18n-loader.js'),
-            options: {
-              memoryTransformOnly: true,
-              functionName: '$t',
-              outputPath: this.options.outputPath
-            }
-          })
-        }
-      })
-    })
-    
-    console.log('AutoI18nPlugin: Memory transform loader registered')
-  }
-
-  private shouldTransformFile(resource: string): boolean {
-    if (!resource) return false
-    if (resource.includes('node_modules')) return false
-    
-    const ext = path.extname(resource).toLowerCase()
-    return ['.vue', '.js', '.ts'].includes(ext)
-  }
-
   private loadTranslationsFromMemory(): { [key: string]: { [locale: string]: string } } {
     const translations: { [key: string]: { [locale: string]: string } } = {}
     
@@ -272,6 +296,7 @@ class AutoI18nPlugin {
 
     return translations
   }
+
 }
 
 // CommonJS 模块导出，webpack插件需要这种格式

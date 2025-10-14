@@ -52,6 +52,12 @@ export interface AutoI18nPluginOptions {
      * @default false
      */
     memoryTransformOnly?: boolean;
+    /**
+     * 是否转换emit阶段生成的代码（包括Vue的render函数）
+     * 这是一个强大但危险的选项，会直接修改webpack输出的资产
+     * @default false
+     */
+    transformEmittedCode?: boolean;
 }
 export interface Translation {
     source: string;

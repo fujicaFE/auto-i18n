@@ -2,19 +2,19 @@
   <div id="app">
     <nav class="navbar">
       <div class="nav-container">
-        <h1 class="nav-title">自动国际化测试项目</h1>
-                <!-- 测试修改触发重编译 v11 -->
+        <h1 class="nav-title">{{ $t('自动国际化测试项目') }}</h1>
+        <!-- 测试修改触发重编译 v11 -->
         <div class="nav-links">
-          <router-link to="/" class="nav-link">首页</router-link>
-          <router-link to="/about" class="nav-link">关于</router-link>
-          <router-link to="/contact" class="nav-link">联系我们</router-link>
+          <router-link to="/" class="nav-link">{{ $t('首页') }}</router-link>
+          <router-link to="/about" class="nav-link">{{ $t('关于') }}</router-link>
+          <router-link to="/contact" class="nav-link">{{ $t('联系我们') }}</router-link>
         </div>
         <div class="language-switcher">
           <select v-model="currentLanguage" @change="changeLanguage">
-            <option value="zh">中文</option>
+            <option value="zh">{{ $t('中文') }}</option>
             <option value="en">English</option>
-            <option value="zh-TW">繁體中文</option>
-            <option value="ja">日本語</option>
+            <option value="zh-TW">{{ $t('繁體中文') }}</option>
+            <option value="ja">{{ $t('日本語') }}</option>
           </select>
         </div>
       </div>
@@ -25,34 +25,33 @@
     </main>
     
     <footer class="footer">
-      <p>版权所有 © 2023 自动国际化测试项目</p>
+      <p>{{ $t('版权所有 © 2023 自动国际化测试项目') }}</p>
     </footer>
   </div>
 </template>
 
-<script>
+<script>import { useI18n } from 'vue-i18n';
 export default {
   name: 'App',
   data() {
     return {
       currentLanguage: this.$i18n.locale
-    }
+    };
   },
   methods: {
     changeLanguage() {
-      this.$i18n.locale = this.currentLanguage
-      console.log('语言已切换到:', this.currentLanguage)
+      this.$i18n.locale = this.currentLanguage;
+      console.log(this.$t("语言已切换到:"), this.currentLanguage);
     },
     showWelcomeMessage() {
-      alert('欢迎使用自动国际化插件！')
+      alert(this.$t("欢迎使用自动国际化插件！"));
     }
   },
   mounted() {
-    console.log('应用已启动')
-    this.showWelcomeMessage()
+    console.log(this.$t("应用已启动"));
+    this.showWelcomeMessage();
   }
-}
-</script>
+};</script>
 
 <style>
 #app {

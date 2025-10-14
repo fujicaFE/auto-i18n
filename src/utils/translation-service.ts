@@ -51,13 +51,16 @@ export class TranslationService {
           // 对于繁体中文，使用chinese-conv库直接转换
           const targetLanguages = this.options.targetLanguages || ['en', 'zh-TW'];
 
-          if (targetLanguages.includes('zh-TW')) {
-            result['zh-TW'] = chineseConv.tify(text);
-          }
-
-          // 对于英文和其他语言，暂时使用原文作为占位符
+          // 为每种目标语言生成翻译
           for (const lang of targetLanguages) {
-            if (lang !== 'zh-TW') {
+            if (lang === this.options.sourceLanguage) {
+              // 源语言使用原文
+              result[lang] = text;
+            } else if (lang === 'zh-TW') {
+              // 繁体中文使用转换
+              result[lang] = chineseConv.tify(text);
+            } else {
+              // 其他语言使用占位符
               result[lang] = `[${lang}] ${text}`;
             }
           }
@@ -80,18 +83,21 @@ export class TranslationService {
           const targetLanguages = this.options.targetLanguages || ['en', 'zh-TW'];
 
           for (const targetLang of targetLanguages) {
-            // 繁体中文可以直接转换
-            if (targetLang === 'zh-TW') {
+            if (targetLang === this.options.sourceLanguage) {
+              // 源语言使用原文
+              result[targetLang] = text;
+            } else if (targetLang === 'zh-TW') {
+              // 繁体中文可以直接转换
               result[targetLang] = chineseConv.tify(text);
               continue;
-            }
-
-            try {
-              const translated = await this.translateWithBaidu(text, targetLang);
-              result[targetLang] = translated;
-            } catch (error) {
-              console.error(`翻译错误 (${text} -> ${targetLang}):`, error);
-              result[targetLang] = `[${targetLang}] ${text}`;
+            } else {
+              try {
+                const translated = await this.translateWithBaidu(text, targetLang);
+                result[targetLang] = translated;
+              } catch (error) {
+                console.error(`翻译错误 (${text} -> ${targetLang}):`, error);
+                result[targetLang] = `[${targetLang}] ${text}`;
+              }
             }
           }
 
@@ -114,12 +120,15 @@ export class TranslationService {
 
           const targetLangs = this.options.targetLanguages || ['en', 'zh-TW'];
 
-          if (targetLangs.includes('zh-TW')) {
-            result['zh-TW'] = chineseConv.tify(text);
-          }
-
           for (const lang of targetLangs) {
-            if (lang !== 'zh-TW') {
+            if (lang === this.options.sourceLanguage) {
+              // 源语言使用原文
+              result[lang] = text;
+            } else if (lang === 'zh-TW') {
+              // 繁体中文使用转换
+              result[lang] = chineseConv.tify(text);
+            } else {
+              // 其他语言使用占位符
               result[lang] = `[${lang}] ${text}`;
             }
           }

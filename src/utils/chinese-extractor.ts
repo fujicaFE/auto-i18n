@@ -48,6 +48,28 @@ export class ChineseExtractor {
       return false;
     }
     
+    // 排除HTML注释
+    if (/<!--.*?-->/.test(text)) {
+      return false;
+    }
+    
+    // 注意：不再过滤已被$t()包装的文本，因为可能翻译文件丢失
+    // 需要确保这些字符串在翻译文件中存在
+    
+    // 排除包含Vue插值表达式的文本（除非是纯中文部分）
+    if (/\{\{.*?\}\}/.test(text)) {
+      // 检查是否整个都是插值表达式
+      if (text.trim().startsWith('{{') && text.trim().endsWith('}}')) {
+        return false;
+      }
+      
+      // 对于包含插值的文本，允许如果中文部分足够多
+      const withoutInterpolation = text.replace(/\{\{.*?\}\}/g, '').trim();
+      if (withoutInterpolation.length < 2 || !CHINESE_REGEX.test(withoutInterpolation)) {
+        return false;
+      }
+    }
+    
     // 排除包含大量特殊字符的文本
     if (/[\r\n\t]{2,}/.test(text)) {
       return false;
@@ -58,21 +80,13 @@ export class ChineseExtractor {
       return false;
     }
     
-    // 对于包含插值的文本，允许如果中文部分足够多
-    if (/\{\{.*\}\}/.test(text)) {
-      const withoutInterpolation = text.replace(/\{\{.*?\}\}/g, '').trim();
-      if (withoutInterpolation.length >= 2 && CHINESE_REGEX.test(withoutInterpolation)) {
-        return true;
-      }
-    }
-    
     // 排除主要包含英文字母和符号的文本
     const chineseCharCount = (text.match(/[\u4e00-\u9fff]/g) || []).length;
     const totalLength = text.length;
     if (chineseCharCount / totalLength < 0.3) {
       return false;
     }
-    
+
     return true;
   }
 
@@ -89,6 +103,11 @@ export class ChineseExtractor {
     while ((match = textContentRegex.exec(template)) !== null) {
       const text = match[1].trim();
       if (text && CHINESE_REGEX.test(text) && !text.includes('\r') && !text.includes('\n')) {
+        // 跳过已经被$t()包装的文本
+        if (/\$t\s*\(/.test(text) || /\{\{\s*\$t\s*\(/.test(text)) {
+          continue;
+        }
+        
         // 如果包含插值语法，尝试提取前面的纯中文部分
         const beforeInterpolation = text.split('{{')[0].trim();
         if (beforeInterpolation && CHINESE_REGEX.test(beforeInterpolation) && beforeInterpolation.length > 0) {
@@ -101,8 +120,8 @@ export class ChineseExtractor {
           chineseTexts.add(cleanText);
         }
         
-        // 同时提取原始文本（可能包含插值）
-        if (text !== cleanText && text.length < 100) { // 避免过长的文本
+        // 同时提取原始文本（可能包含插值），但排除$t()包装的内容
+        if (text !== cleanText && text.length < 100 && !/\$t\s*\(/.test(text)) { // 避免过长的文本和$t()函数
           chineseTexts.add(text);
         }
       }
@@ -135,10 +154,15 @@ export class ChineseExtractor {
       }
     }
 
-    // 5. 从插值表达式中提取字符串字面量
+    // 5. 从插值表达式中提取字符串字面量（排除$t()函数）
     const interpolationBlocks = template.match(/\{\{[^}]+\}\}/g);
     if (interpolationBlocks) {
       for (const block of interpolationBlocks) {
+        // 跳过已经使用$t()的插值表达式
+        if (/\$t\s*\(/.test(block)) {
+          continue;
+        }
+        
         const stringInInterpolation = /['"]([^'"]*[\u4e00-\u9fff][^'"]*)['"]/g;
         let interpolationMatch;
         while ((interpolationMatch = stringInInterpolation.exec(block)) !== null) {

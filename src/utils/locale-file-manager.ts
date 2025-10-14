@@ -5,11 +5,13 @@ import { Translation } from '../types';
 export class LocaleFileManager {
   private outputPath: string;
   private locales: string[];
+  private sourceLanguage: string;
   private translations: Map<string, Record<string, string>> = new Map();
 
-  constructor(outputPath: string, locales: string[] = ['en', 'zh-TW']) {
+  constructor(outputPath: string, locales: string[] = ['en', 'zh-TW'], sourceLanguage: string = 'zh') {
     this.outputPath = outputPath;
     this.locales = locales;
+    this.sourceLanguage = sourceLanguage;
   }
 
   /**
@@ -104,7 +106,12 @@ export class LocaleFileManager {
       // 将每个语言的翻译添加到相应的数据结构中
       for (const [locale, text] of Object.entries(translatedTexts)) {
         if (this.locales.includes(locale)) {
-          localeData[locale][source] = text;
+          // 如果是源语言，使用原文
+          if (locale === this.sourceLanguage) {
+            localeData[locale][source] = source;
+          } else {
+            localeData[locale][source] = text;
+          }
         }
       }
     }

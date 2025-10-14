@@ -1,51 +1,49 @@
 <template>
-  <div class="home">
-    <!-- 添加国际化测试组件 -->
-    <I18nTest />
+  <div class="home">{{ $t('<!-- 添加国际化测试组件 -->') }}</I18nTest />
     
     <div class="hero-section">
-      <h1 class="hero-title">欢迎使用自动国际化插件</h1>
-      <p class="hero-subtitle">这是一个演示项目，展示webpack插件如何自动提取和翻译中文文本</p>
-      <button class="cta-button" @click="showDemo">开始演示</button>
+      <h1 class="hero-title">{{ $t('欢迎使用自动国际化插件') }}</h1>
+      <p class="hero-subtitle">{{ $t('这是一个演示项目，展示webpack插件如何自动提取和翻译中文文本') }}</p>
+      <button class="cta-button" @click="showDemo">{{ $t('开始演示') }}</button>
     </div>
 
     <div class="features-section">
-      <h2 class="section-title">主要特性</h2>
+      <h2 class="section-title">{{ $t('主要特性') }}</h2>
       <div class="features-grid">
         <div class="feature-card">
-          <h3>自动提取</h3>
-          <p>自动从Vue组件和JavaScript文件中提取中文文本</p>
+          <h3>{{ $t('自动提取') }}</h3>
+          <p>{{ $t('自动从Vue组件和JavaScript文件中提取中文文本') }}</p>
         </div>
         <div class="feature-card">
-          <h3>智能翻译</h3>
-          <p>支持多种翻译服务，包括百度翻译、谷歌翻译等</p>
+          <h3>{{ $t('智能翻译') }}</h3>
+          <p>{{ $t('支持多种翻译服务，包括百度翻译、谷歌翻译等') }}</p>
         </div>
         <div class="feature-card">
-          <h3>代码转换</h3>
-          <p>自动将中文字符串替换为i18n函数调用</p>
+          <h3>{{ $t('代码转换') }}</h3>
+          <p>{{ $t('自动将中文字符串替换为i18n函数调用') }}</p>
         </div>
         <div class="feature-card">
-          <h3>预设翻译</h3>
-          <p>支持预定义翻译词汇，优先于自动翻译</p>
+          <h3>{{ $t('预设翻译') }}</h3>
+          <p>{{ $t('支持预定义翻译词汇，优先于自动翻译') }}</p>
         </div>
       </div>
     </div>
 
     <div class="demo-section">
-      <h2 class="section-title">功能演示</h2>
+      <h2 class="section-title">{{ $t('功能演示') }}</h2>
       <div class="demo-form">
         <div class="form-group">
-          <label for="username">用户名:</label>
-          <input type="text" id="username" v-model="demoForm.username" placeholder="请输入用户名">
+          <label for="username">{{ $t('用户名:') }}</label>
+          <input type="text" id="username" v-model="demoForm.username" :placeholder="$t('请输入用户名')">
         </div>
         <div class="form-group">
-          <label for="password">密码:</label>
-          <input type="password" id="password" v-model="demoForm.password" placeholder="请输入密码">
+          <label for="password">{{ $t('密码:') }}</label>
+          <input type="password" id="password" v-model="demoForm.password" :placeholder="$t('请输入密码')">
         </div>
         <div class="form-actions">
-          <button @click="handleLogin" class="primary-btn">登录</button>
-          <button @click="handleRegister" class="secondary-btn">注册</button>
-          <button @click="handleReset" class="secondary-btn">重置</button>
+          <button @click="handleLogin" class="primary-btn">{{ $t('登录') }}</button>
+          <button @click="handleRegister" class="secondary-btn">{{ $t('注册') }}</button>
+          <button @click="handleReset" class="secondary-btn">{{ $t('重置') }}</button>
         </div>
       </div>
     </div>
@@ -60,9 +58,9 @@
   </div>
 </template>
 
-<script>
-import DemoComponent from '@/components/DemoComponent.vue'
-import I18nTest from '@/components/I18nTest.vue'
+<script>import { useI18n } from 'vue-i18n';
+import DemoComponent from '@/components/DemoComponent.vue';
+import I18nTest from '@/components/I18nTest.vue';
 
 export default {
   name: 'Home',
@@ -79,47 +77,46 @@ export default {
       showStatus: false,
       statusMessage: '',
       statusType: 'success'
-    }
+    };
   },
   methods: {
     showDemo() {
-      alert('这是一个演示弹窗，展示中文文本的自动国际化！')
+      alert(this.$t("这是一个演示弹窗，展示中文文本的自动国际化！"));
     },
     handleLogin() {
       if (!this.demoForm.username || !this.demoForm.password) {
-        this.showStatusMessage('请填写完整的登录信息', 'error')
-        return
+        this.showStatusMessage(this.$t("请填写完整的登录信息"), 'error');
+        return;
       }
-      this.showStatusMessage('登录成功！', 'success')
-      console.log('用户登录:', this.demoForm.username)
+      this.showStatusMessage(this.$t("登录成功！"), 'success');
+      console.log(this.$t("用户登录:"), this.demoForm.username);
     },
     handleRegister() {
       if (!this.demoForm.username) {
-        this.showStatusMessage('请先输入用户名', 'error')
-        return
+        this.showStatusMessage(this.$t("请先输入用户名"), 'error');
+        return;
       }
-      this.showStatusMessage('注册功能开发中...', 'info')
+      this.showStatusMessage(this.$t("注册功能开发中..."), 'info');
     },
     handleReset() {
-      this.demoForm.username = ''
-      this.demoForm.password = ''
-      this.showStatusMessage('表单已重置', 'info')
+      this.demoForm.username = '';
+      this.demoForm.password = '';
+      this.showStatusMessage(this.$t("表单已重置"), 'info');
     },
     showStatusMessage(message, type) {
-      this.statusMessage = message
-      this.statusType = type
-      this.showStatus = true
-      
+      this.statusMessage = message;
+      this.statusType = type;
+      this.showStatus = true;
+
       setTimeout(() => {
-        this.showStatus = false
-      }, 3000)
+        this.showStatus = false;
+      }, 3000);
     }
   },
   mounted() {
-    console.log('首页组件已加载')
+    console.log(this.$t("首页组件已加载"));
   }
-}
-</script>
+};</script>
 
 <style scoped>
 .home {
