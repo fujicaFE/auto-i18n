@@ -4,13 +4,22 @@ on:
   push:
     tags:
       - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Manual release version (must match package.json)'
+        required: false
+      dry_run:
+        description: 'Set to 1 to run publish dry-run'
+        required: false
+        default: '0'
 
 jobs:
   publish:
     name: Publish to npm
     runs-on: ubuntu-latest
     permissions:
-      contents: read
+      contents: write
       packages: write
     steps:
       - name: Checkout
@@ -39,6 +48,16 @@ jobs:
           fi
           echo "version=$PKG_VERSION" >> $GITHUB_OUTPUT
 
+      - name: Check NPM_TOKEN
+        run: |
+          if [ -z "${{ secrets.NPM_TOKEN }}" ]; then
+            echo "::error::NPM_TOKEN secret is not configured";
+            exit 1;
+          fi
+
+      - name: Show npm user (sanity)
+        run: npm whoami || echo "(not logged yet - will use token during publish)"
+
       - name: Install dependencies
         run: npm ci
 
@@ -51,8 +70,14 @@ jobs:
       - name: Publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
         run: |
-          npm publish --access public
+          if [ "${DRY_RUN}" = "1" ]; then
+            echo "Dry run mode enabled (no publish).";
+            npm publish --access public --dry-run;
+          else
+            npm publish --access public;
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
