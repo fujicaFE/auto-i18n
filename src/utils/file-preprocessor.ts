@@ -14,16 +14,28 @@ export class FilePreprocessor {
   private chineseExtractor: ChineseExtractor
   private processedFiles: Map<string, string> = new Map() // 文件路径 -> 文件内容哈希
   private codeStyle?: { semicolons?: boolean; quotes?: 'single' | 'double' }
+  private logLevel: 'silent' | 'minimal' | 'verbose'
+  private perFileLog: boolean
+  private summaryOnly: boolean
 
-  constructor(chineseExtractor: ChineseExtractor, codeStyle?: { semicolons?: boolean; quotes?: 'single' | 'double' }) {
+  constructor(chineseExtractor: ChineseExtractor, codeStyle?: { semicolons?: boolean; quotes?: 'single' | 'double' }, logLevel: 'silent' | 'minimal' | 'verbose' = 'verbose', perFileLog: boolean = true, summaryOnly: boolean = false) {
     this.chineseExtractor = chineseExtractor
     this.codeStyle = codeStyle
+    this.logLevel = logLevel
+    this.perFileLog = perFileLog
+    this.summaryOnly = summaryOnly
+  }
+
+  private log(level: 'verbose' | 'minimal', ...args: any[]) {
+    if (this.logLevel === 'silent') return
+    if (this.logLevel === 'minimal' && level === 'verbose') return
+    console.log(...args)
   }
 
   /**
    * 直接处理Vue文件，修改源文件
    */
-  async processVueFilesDirectly(outputPath: string): Promise<void> {
+  async processVueFilesDirectly(outputPath: string): Promise<{ scanned: number; updated: number; skipped: number; chinese: number; }> {
     try {
       const glob = require('glob')
       const fs = require('fs')
@@ -35,12 +47,14 @@ export class FilePreprocessor {
         ignore: ['node_modules/**', 'dist/**', 'build/**']
       })
       
-      console.log(`🔍 AutoI18nPlugin: 发现 ${vueFiles.length} 个Vue文件需要处理`)
+  if (!this.summaryOnly) this.log('minimal', `🔍 AutoI18nPlugin: 发现 ${vueFiles.length} 个Vue文件需要处理`)
       
       // 加载翻译数据
       const translations = this.loadTranslationsFromMemory(outputPath)
       
-      let processedCount = 0
+  let processedCount = 0
+  let skipped = 0
+  let chineseCount = 0
       
       for (const relativeFilePath of vueFiles) {
         const absoluteFilePath = path.resolve(process.cwd(), relativeFilePath)
@@ -55,14 +69,16 @@ export class FilePreprocessor {
           // 检查是否已经处理过相同内容的文件
           if (this.processedFiles.has(absoluteFilePath) && 
               this.processedFiles.get(absoluteFilePath) === contentHash) {
-            console.log(`⏭️ AutoI18nPlugin: 跳过已处理文件 - ${relativeFilePath}`)
+            if (!this.summaryOnly && this.perFileLog) this.log('verbose', `⏭️ AutoI18nPlugin: 跳过已处理文件 - ${relativeFilePath}`)
+            skipped++
             continue
           }
           
           // 检查是否包含中文
           const chineseRegex = /[\u4e00-\u9fff]/
           if (chineseRegex.test(originalContent)) {
-            console.log(`📝 AutoI18nPlugin: 处理Vue文件 - ${relativeFilePath}`)
+            chineseCount++
+            if (!this.summaryOnly && this.perFileLog) this.log('verbose', `📝 AutoI18nPlugin: 处理Vue文件 - ${relativeFilePath}`)
             
             // 转换内容
             const transformedContent = this.transformVueFileContent(originalContent, translations)
@@ -74,20 +90,20 @@ export class FilePreprocessor {
               // 避免写入相同内容
               if (contentHash !== transformedHash) {
                 fs.writeFileSync(absoluteFilePath, transformedContent, 'utf-8')
-                console.log(`✅ AutoI18nPlugin: 已更新文件 - ${relativeFilePath}`)
+                if (!this.summaryOnly && this.perFileLog) this.log('minimal', `✅ AutoI18nPlugin: 已更新文件 - ${relativeFilePath}`)
                 processedCount++
                 
                 // 记录处理过的文件
                 this.processedFiles.set(absoluteFilePath, transformedHash)
               } else {
-                console.log(`ℹ️ AutoI18nPlugin: 内容无变化 - ${relativeFilePath}`)
+                if (!this.summaryOnly && this.perFileLog) this.log('verbose', `ℹ️ AutoI18nPlugin: 内容无变化 - ${relativeFilePath}`)
               }
             } else {
-              console.log(`ℹ️ AutoI18nPlugin: 无需转换 - ${relativeFilePath}`)
+              if (!this.summaryOnly && this.perFileLog) this.log('verbose', `ℹ️ AutoI18nPlugin: 无需转换 - ${relativeFilePath}`)
               this.processedFiles.set(absoluteFilePath, contentHash)
             }
           } else {
-            console.log(`⚪ AutoI18nPlugin: 无中文内容 - ${relativeFilePath}`)
+            if (!this.summaryOnly && this.perFileLog) this.log('verbose', `⚪ AutoI18nPlugin: 无中文内容 - ${relativeFilePath}`)
             this.processedFiles.set(absoluteFilePath, contentHash)
           }
         } catch (error) {
@@ -95,9 +111,14 @@ export class FilePreprocessor {
         }
       }
       
-      console.log(`🎯 AutoI18nPlugin: 文件处理完成，实际更新了 ${processedCount} 个文件`)
+    if (!this.summaryOnly) {
+      if (this.perFileLog) this.log('minimal', `🎯 AutoI18nPlugin: 文件处理完成，实际更新了 ${processedCount} 个文件`)
+      else this.log('minimal', `🎯 AutoI18nPlugin: 预处理完成 scanned=${vueFiles.length} updated=${processedCount} skipped=${skipped} chinese=${chineseCount}`)
+    }
+    return { scanned: vueFiles.length, updated: processedCount, skipped, chinese: chineseCount }
     } catch (error) {
       console.error('❌ AutoI18nPlugin: processVueFilesDirectly 失败:', error)
+      return { scanned: 0, updated: 0, skipped: 0, chinese: 0 }
     }
   }
 
@@ -114,7 +135,7 @@ export class FilePreprocessor {
         return content // 如果没有中文文本，直接返回原内容
       }
       
-      console.log(`   发现 ${chineseTexts.length} 个中文文本`)
+    this.log('verbose', `   发现 ${chineseTexts.length} 个中文文本`)
       
       // 使用专业的Transformer来处理Vue文件
       const { Transformer } = require('./transformer')
@@ -130,7 +151,7 @@ export class FilePreprocessor {
       // 如果转换后有变化，记录转换的文本
       if (transformedContent !== content) {
         for (const text of chineseTexts) {
-          console.log(`   替换: "${text}" -> $t('${text}')`)
+          this.log('verbose', `   替换: "${text}" -> $t('${text}')`)
         }
       }
       

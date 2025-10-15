@@ -12,7 +12,8 @@ module.exports = {
         transformCode: true,
         presets: {},
         ignoreComments: true,
-        exclude: ['/node_modules/', /\.min\.js$/]
+        exclude: ['/node_modules/', /\.min\.js$/],
+        logLevel: 'minimal'
       })
     ]
   }

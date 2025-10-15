@@ -10,6 +10,7 @@ A webpack plugin for automatic internationalization of Chinese text in Vue.js pr
 - Integrates with Vue i18n for seamless internationalization
 - Transforms Chinese strings to $t() function calls (optional)
 - Preserves original Chinese text as comments
+- Configurable logging (logLevel, logThrottleMs) and build summary stats
 
 ## Installation
 
@@ -76,7 +77,17 @@ new AutoI18nPlugin({
   },
   
   // Whether to transform Chinese strings to i18n function calls
-  transformCode: true
+  transformCode: true,
+
+  // Whether to skip machine translation for texts already existing in locale files
+  // Still wraps with $t() in code
+  skipExistingTranslation: true,
+
+  // Logging level: 'silent' | 'minimal' | 'verbose'
+  // minimal: only key phase summary logs
+  logLevel: 'minimal'
+  // Throttle interval (ms) for lifecycle logs (beforeCompile etc.)
+  logThrottleMs: 5000
 })
 ```
 
@@ -198,6 +209,8 @@ The test project includes:
 After running `npm run build`, check the generated files:
 - `src/locales/` - Generated translation files
 - `dist/` - Transformed code with `$t()` function calls
+ - Console summary line (minimal mode):
+   `[auto-i18n:summary] Vue files scanned=12 updated=3 skipped=9 chinese=5 newKeys=2`
 
 For detailed information about the test project, see [test-project/README.md](./test-project/README.md).
 

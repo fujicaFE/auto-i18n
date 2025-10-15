@@ -97,8 +97,8 @@ export class ChineseExtractor {
   extractFromTemplate(template: string): string[] {
     const chineseTexts = new Set<string>();
 
-    // 1. 提取标签之间的纯文本内容（包括插值表达式）
-    const textContentRegex = />([^<]*[\u4e00-\u9fff][^<]*)</g;
+  // 1. 提取标签之间的纯文本内容（包括插值表达式）
+  const textContentRegex = />([^<]*[\u4e00-\u9fff][^<]*)</g;
     let match;
     while ((match = textContentRegex.exec(template)) !== null) {
       const text = match[1].trim();
@@ -108,20 +108,15 @@ export class ChineseExtractor {
           continue;
         }
         
-        // 如果包含插值语法，尝试提取前面的纯中文部分
-        const beforeInterpolation = text.split('{{')[0].trim();
-        if (beforeInterpolation && CHINESE_REGEX.test(beforeInterpolation) && beforeInterpolation.length > 0) {
-          chineseTexts.add(beforeInterpolation);
-        }
-        
-        // 进一步清理：移除Vue插值语法和多余空白
-        const cleanText = text.replace(/\{\{.*?\}\}/g, '').replace(/\s+/g, ' ').trim();
-        if (cleanText && cleanText.length > 0 && CHINESE_REGEX.test(cleanText)) {
-          chineseTexts.add(cleanText);
-        }
-        
-        // 同时提取原始文本（可能包含插值），但排除$t()包装的内容
-        if (text !== cleanText && text.length < 100 && !/\$t\s*\(/.test(text)) { // 避免过长的文本和$t()函数
+        if (text.includes('{{')) {
+          // 拆分插值，保留纯中文片段
+            const segments = text.split(/\{\{[^}]*\}\}/).map(s => s.trim()).filter(Boolean);
+            for (const seg of segments) {
+              if (seg && CHINESE_REGEX.test(seg)) {
+                chineseTexts.add(seg);
+              }
+            }
+        } else {
           chineseTexts.add(text);
         }
       }

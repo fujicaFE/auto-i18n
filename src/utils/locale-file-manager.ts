@@ -41,6 +41,26 @@ export class LocaleFileManager {
   }
 
   /**
+   * 按源文本列表获取翻译记录（若 sources 未传则返回全部）
+   */
+  getTranslations(sources?: string[]): Translation[] {
+    const result: Translation[] = [];
+    if (sources) {
+      for (const src of sources) {
+        const record = this.translations.get(src);
+        if (record) {
+          result.push({ source: src, translations: record });
+        }
+      }
+    } else {
+      for (const [src, record] of this.translations.entries()) {
+        result.push({ source: src, translations: record });
+      }
+    }
+    return result;
+  }
+
+  /**
    * 确保输出目录存在
    */
   ensureOutputPath(): void {
@@ -88,44 +108,43 @@ export class LocaleFileManager {
    * 保存翻译到文件
    */
   saveTranslations(translations: Translation[]): void {
-    // 确保输出目录存在
     this.ensureOutputPath();
-
-    // 按语言组织翻译
-    const localeData: Record<string, Record<string, string>> = {};
-
-    // 初始化语言数据结构
+    // 读取现有文件
+    const existingByLocale: Record<string, Record<string, string>> = {};
     for (const locale of this.locales) {
-      localeData[locale] = {};
+      const filePath = path.join(this.outputPath, `${locale}.json`);
+      if (fs.existsSync(filePath)) {
+        try {
+          existingByLocale[locale] = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        } catch {
+          existingByLocale[locale] = {};
+        }
+      } else {
+        existingByLocale[locale] = {};
+      }
     }
 
-    // 将翻译数据按语言组织
+    // 合并：保留现有键顺序，追加新键
     for (const translation of translations) {
       const { source, translations: translatedTexts } = translation;
-
-      // 将每个语言的翻译添加到相应的数据结构中
-      for (const [locale, text] of Object.entries(translatedTexts)) {
-        if (this.locales.includes(locale)) {
-          // 如果是源语言，使用原文
-          if (locale === this.sourceLanguage) {
-            localeData[locale][source] = source;
-          } else {
-            localeData[locale][source] = text;
-          }
+      for (const locale of this.locales) {
+        const target = existingByLocale[locale];
+        const candidate = translatedTexts[locale];
+        if (candidate !== undefined) {
+          target[source] = locale === this.sourceLanguage ? source : candidate;
+        } else if (locale === this.sourceLanguage && !target[source]) {
+          target[source] = source; // 确保源语言有条目
         }
       }
     }
 
-    // 保存每种语言的翻译到对应的文件
     for (const locale of this.locales) {
       const filePath = path.join(this.outputPath, `${locale}.json`);
-      const content = JSON.stringify(localeData[locale], null, 2);
-
       try {
-        fs.writeFileSync(filePath, content, 'utf8');
+        fs.writeFileSync(filePath, JSON.stringify(existingByLocale[locale], null, 2), 'utf8');
         console.log(`成功保存翻译文件: ${filePath}`);
-      } catch (error) {
-        console.error(`保存翻译文件失败 ${filePath}:`, error);
+      } catch (e) {
+        console.error(`保存翻译文件失败 ${filePath}:`, e);
       }
     }
   }
@@ -175,5 +194,12 @@ export class LocaleFileManager {
     }
 
     return merged;
+  }
+
+  /**
+   * 获取当前内存中已加载（或合并后）的全部源文本 key 总数
+   */
+  getTotalKeyCount(): number {
+    return this.translations.size;
   }
 }

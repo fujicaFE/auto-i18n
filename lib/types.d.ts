@@ -1,3 +1,7 @@
+/**
+ * 输出语言文件的目录路径
+ * @default './src/locales'
+ */
 export interface AutoI18nPluginOptions {
     /**
      * 输出语言文件的目录路径
@@ -13,6 +17,19 @@ export interface AutoI18nPluginOptions {
             [key: string]: string;
         };
     };
+    /**
+     * 日志级别:
+     * - 'silent': 不输出(严重错误除外)
+     * - 'minimal': 关键信息 + 关键阶段一次性摘要
+     * - 'verbose': 全量日志 (默认)
+     * @default 'verbose'
+     */
+    logLevel?: 'silent' | 'minimal' | 'verbose';
+    /**
+     * beforeCompile 等阶段重复日志的节流毫秒数
+     * @default 5000
+     */
+    logThrottleMs?: number;
     /**
      * 要排除的文件路径模式（字符串或正则表达式）
      */
@@ -79,6 +96,12 @@ export interface AutoI18nPluginOptions {
          */
         quotes?: 'single' | 'double';
     };
+    /**
+     * 是否跳过已存在于翻译文件中的源文本的再次机器翻译
+     * 仍会在代码中包裹 $t，但不再调用外部翻译服务
+     * @default true
+     */
+    skipExistingTranslation?: boolean;
 }
 export interface Translation {
     source: string;

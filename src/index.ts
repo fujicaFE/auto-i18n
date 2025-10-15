@@ -49,7 +49,6 @@ class AutoI18nPlugin {
     newKeys: number;
   } = { scannedVue: 0, updatedVue: 0, skippedVue: 0, chineseVue: 0, newKeys: 0 }
   private hasPreprocessedVue: boolean = false
-  private pendingPreprocess: boolean = false
 
   constructor(options: AutoI18nPluginOptions) {
     this.options = {
@@ -94,7 +93,7 @@ class AutoI18nPlugin {
     this.renderDetector = new RenderDetector()
     this.codeAnalyzer = new CodeAnalyzer()
     this.logLevel = this.options.logLevel || 'verbose'
-    // summaryOnly: 在非 verbose 模式下，只输出最终汇总
+  // summaryOnly: 在非 verbose 模式下，只输出最终汇总
     const summaryOnly = this.logLevel !== 'verbose'
     this.filePreprocessor = new FilePreprocessor(
       this.chineseExtractor,
@@ -253,7 +252,6 @@ class AutoI18nPlugin {
         // 遍历所有生成的资产
         for (const [filename, asset] of Object.entries(compilation.assets)) {
           // 只处理JavaScript文件
-                  this.pendingPreprocess = false
           if (filename.endsWith('.js')) {
             console.log(`📄 AutoI18nPlugin: 分析JavaScript资产 - ${filename}`)
             
@@ -334,14 +332,19 @@ class AutoI18nPlugin {
 
     if (toSave.length > 0) {
       this.localeFileManager.saveTranslations(toSave)
-      this.log('minimal', 'translate', `saved locales: keys(all)=${allTexts.length} new=${newlyTranslated.length}`)
+      // totalKeys: 当前翻译文件累积总 key 数；processed: 本次涉及（新增+已存在使用）数量
+      const totalKeys = this.localeFileManager.getTotalKeyCount()
+      const processedCount = toSave.length
+      this.log('minimal', 'translate', `saved locales: keys(total)=${totalKeys} processed=${processedCount} new=${newlyTranslated.length}`)
     }
     this.translationsProcessed = true
     this.processedTexts.clear()
   }
 
   private outputSummary() {
-    this.log('minimal', 'summary', `Vue files scanned=${this.metrics.scannedVue} updated=${this.metrics.updatedVue} skipped=${this.metrics.skippedVue} chinese=${this.metrics.chineseVue} newKeys=${this.metrics.newKeys}`)
+    // totalKeys: 当前翻译文件总 key 数（加载后）
+    const totalKeys = this.localeFileManager.getTotalKeyCount?.() ?? 0
+    this.log('minimal', 'summary', `Vue files scanned=${this.metrics.scannedVue} updated=${this.metrics.updatedVue} skipped=${this.metrics.skippedVue} chinese=${this.metrics.chineseVue} newKeys=${this.metrics.newKeys} totalKeys=${totalKeys}`)
   }
 
   private loadTranslationsFromMemory(): { [key: string]: { [locale: string]: string } } {
