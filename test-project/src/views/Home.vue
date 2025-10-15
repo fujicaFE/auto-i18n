@@ -82,6 +82,14 @@ export default {
     placeholder: {
       type: String,
       default: i18n.t('请输入车牌号码')
+    },
+    teststr: {
+      type: String,
+      default: ''
+    },
+    sas: {
+      type: String,
+      default: i18n.t('阿斯顿发送到')
     }
   },
   data() {
