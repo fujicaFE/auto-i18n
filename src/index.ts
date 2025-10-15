@@ -37,6 +37,19 @@ class AutoI18nPlugin {
   private compilationCount: number = 0
   private processedFiles: Set<string> = new Set()
   private isProcessing: boolean = false
+  private translationsProcessed: boolean = false
+  private logLevel: 'silent' | 'minimal' | 'verbose'
+  private logThrottleMs: number
+  private lastBeforeCompileLog = 0
+  private metrics: {
+    scannedVue: number;
+    updatedVue: number;
+    skippedVue: number;
+    chineseVue: number;
+    newKeys: number;
+  } = { scannedVue: 0, updatedVue: 0, skippedVue: 0, chineseVue: 0, newKeys: 0 }
+  private hasPreprocessedVue: boolean = false
+  private pendingPreprocess: boolean = false
 
   constructor(options: AutoI18nPluginOptions) {
     this.options = {
@@ -49,6 +62,7 @@ class AutoI18nPlugin {
       sourceLanguage: 'zh',
       targetLanguages: ['en', 'zh-TW'],
       enableProductionAnalysis: false, // 默认不启用产物分析
+      skipExistingTranslation: true,
       ...options
     }
 
@@ -79,7 +93,31 @@ class AutoI18nPlugin {
     // 初始化新的工具类
     this.renderDetector = new RenderDetector()
     this.codeAnalyzer = new CodeAnalyzer()
-    this.filePreprocessor = new FilePreprocessor(this.chineseExtractor, this.options.codeStyle)
+    this.logLevel = this.options.logLevel || 'verbose'
+    // summaryOnly: 在非 verbose 模式下，只输出最终汇总
+    const summaryOnly = this.logLevel !== 'verbose'
+    this.filePreprocessor = new FilePreprocessor(
+      this.chineseExtractor,
+      this.options.codeStyle,
+      this.logLevel,
+      this.logLevel === 'verbose', // perFileLog 仅在 verbose 下开启
+      summaryOnly
+    )
+    this.logThrottleMs = this.options.logThrottleMs ?? 5000
+  }
+
+  private log(level: 'verbose' | 'minimal', domain: string, ...args: any[]) {
+    if (this.logLevel === 'silent') return
+    if (this.logLevel === 'minimal' && level === 'verbose') return
+    const prefix = `[auto-i18n:${domain}]`
+    console.log(prefix, ...args)
+  }
+
+  private logOnceFlag: Set<string> = new Set()
+  private logOnce(key: string, level: 'verbose' | 'minimal', domain: string, ...args: any[]) {
+    if (this.logOnceFlag.has(key)) return
+    this.logOnceFlag.add(key)
+    this.log(level, domain, ...args)
   }
 
   apply(compiler: any) {
@@ -139,27 +177,38 @@ class AutoI18nPlugin {
 
     // 🔥 新增：在编译开始前直接预处理Vue文件
     if (this.options.transformCode) {
-      compiler.hooks.beforeCompile.tap('AutoI18nPlugin', (params: any) => {
-        // 防止重复处理和循环调用
-        if (this.isProcessing) {
-          console.log('⚠️ AutoI18nPlugin: 已在处理中，跳过本次预处理')
+      compiler.hooks.beforeCompile.tap('AutoI18nPlugin', () => {
+        // 已经处理过（或正在处理）直接跳过，确保只跑一次
+        if (this.hasPreprocessedVue || this.isProcessing) {
+          this.log('verbose', 'lifecycle', '已标记/正在预处理，跳过本次 beforeCompile')
           return
         }
-
-        // 只在第一次编译时处理
+        // 仅首次编译（done 里才会 ++）
         if (this.compilationCount > 0) {
-          console.log('ℹ️ AutoI18nPlugin: 非首次编译，跳过Vue文件预处理')
+          this.log('verbose', 'lifecycle', '非首次编译，跳过预处理')
           return
         }
-
-        console.log('🚀 AutoI18nPlugin: beforeCompile - 开始直接预处理Vue文件')
-        
+        this.hasPreprocessedVue = true // 立刻标记，防止短时间多次 beforeCompile 重入
         this.isProcessing = true
-        
-        // 异步处理，但不阻塞编译
+        if (this.logLevel === 'verbose') {
+          const now = Date.now()
+          if (now - this.lastBeforeCompileLog > this.logThrottleMs) {
+            this.lastBeforeCompileLog = now
+            this.log('minimal', 'lifecycle', 'beforeCompile - 开始直接预处理Vue文件')
+          }
+        }
+
         this.filePreprocessor.processVueFilesDirectly(this.options.outputPath)
-          .then(() => {
-            console.log('✅ AutoI18nPlugin: Vue文件直接预处理完成')
+          .then(stats => {
+            if (stats) {
+              this.metrics.scannedVue += stats.scanned
+              this.metrics.updatedVue += stats.updated
+              this.metrics.skippedVue += stats.skipped
+              this.metrics.chineseVue += stats.chinese
+            }
+            if (this.logLevel === 'verbose') {
+              this.log('minimal', 'lifecycle', 'Vue文件直接预处理完成')
+            }
           })
           .catch(error => {
             console.error('❌ AutoI18nPlugin: Vue文件预处理失败:', error)
@@ -177,13 +226,18 @@ class AutoI18nPlugin {
         
         // 只在第一次编译完成时处理，避免循环
         if (this.compilationCount === 1 && this.processedTexts.size > 0) {
-          console.log(`AutoI18nPlugin: Dev mode - cached ${this.processedTexts.size} translations for potential save`)
+          this.log('verbose', 'dev', `cached ${this.processedTexts.size} translations for potential save`)
         }
         
         // 每次编译完成后重置处理状态（除了第一次）
         if (this.compilationCount > 1) {
           this.processedFiles.clear()
-          console.log('🔄 AutoI18nPlugin: 重置文件处理状态以准备下次编译')
+          this.log('verbose', 'dev', '重置文件处理状态以准备下次编译')
+        }
+        // 输出汇总（仅首次 compile 后）
+        if (this.compilationCount === 1) {
+          // 只输出一次最终汇总；所有模式统一在此输出（前面 summaryOnly 已抑制中间日志）
+          this.outputSummary()
         }
       })
     }
@@ -199,6 +253,7 @@ class AutoI18nPlugin {
         // 遍历所有生成的资产
         for (const [filename, asset] of Object.entries(compilation.assets)) {
           // 只处理JavaScript文件
+                  this.pendingPreprocess = false
           if (filename.endsWith('.js')) {
             console.log(`📄 AutoI18nPlugin: 分析JavaScript资产 - ${filename}`)
             
@@ -228,7 +283,7 @@ class AutoI18nPlugin {
         console.log('✅ AutoI18nPlugin: emit钩子分析完成')
       });
     } else {
-      console.log('ℹ️ AutoI18nPlugin: 生产环境分析已禁用 (enableProductionAnalysis: false)')
+      this.log('minimal', 'analysis', '生产环境分析已禁用 (enableProductionAnalysis: false)')
     }
   }
 
@@ -251,54 +306,42 @@ class AutoI18nPlugin {
   }
 
   private async processCollectedTexts() {
-    if (this.processedTexts.size === 0) {
-      console.log('AutoI18nPlugin: No Chinese texts found in source files')
-      return
-    }
+    if (this.translationsProcessed) return
+    if (this.processedTexts.size === 0) return
 
-    console.log('AutoI18nPlugin: Processing source files...')
-
-    // 读取现有的翻译文件
     await this.localeFileManager.loadTranslations()
-
-    // 翻译新的中文文本 - 过滤掉已处理的文本避免重复处理
     const allTexts = Array.from(this.processedTexts)
-    const newTexts = allTexts.filter(
-      text => !this.localeFileManager.hasTranslation(text)
-    )
+
+    const newTexts = allTexts.filter(text => !this.localeFileManager.hasTranslation(text))
+    let newlyTranslated: Translation[] = []
 
     if (newTexts.length > 0) {
-      console.log(`AutoI18nPlugin: Found ${newTexts.length} new Chinese texts to translate`)
-
-      try {
-        const translations = await this.translationService.translateBatch(newTexts)
-
-        // 更新翻译文件
-        this.localeFileManager.addTranslations(translations)
-
-        // 在开发模式下，只保存第一次编译的结果，避免无限循环
-        this.compilationCount++
-        
-        if (!this.isDevMode || this.compilationCount === 1) {
-          // 将翻译保存到文件
-          const allTranslationsArray: Translation[] = []
-          for (const text of allTexts) {
-            const translationRecord = await this.translationService.translateBatch([text])
-            if (translationRecord.length > 0) {
-              allTranslationsArray.push(translationRecord[0])
-            }
-          }
-          this.localeFileManager.saveTranslations(allTranslationsArray)
-          console.log(`AutoI18nPlugin: Translations saved to ${this.options.outputPath}`)
-        } else {
-          console.log('AutoI18nPlugin: Dev mode - translations cached but not saved to avoid rebuild loop')
+  this.log('minimal', 'translate', `new texts: ${newTexts.length}`)
+  this.metrics.newKeys += newTexts.length
+      if (this.options.skipExistingTranslation !== false) {
+                  this.hasPreprocessedVue = true
+        try {
+          newlyTranslated = await this.translationService.translateBatch(newTexts)
+          this.localeFileManager.addTranslations(newlyTranslated)
+        } catch (e) {
+          console.error('[auto-i18n] translate error', e)
         }
-      } catch (error) {
-        console.error('AutoI18nPlugin: Translation error', error)
       }
-    } else {
-      console.log('AutoI18nPlugin: No new Chinese texts found in source files')
     }
+
+    const existingUsed = this.localeFileManager.getTranslations(allTexts.filter(t => !newTexts.includes(t)))
+    const toSave = [...existingUsed, ...newlyTranslated]
+
+    if (toSave.length > 0) {
+      this.localeFileManager.saveTranslations(toSave)
+      this.log('minimal', 'translate', `saved locales: keys(all)=${allTexts.length} new=${newlyTranslated.length}`)
+    }
+    this.translationsProcessed = true
+    this.processedTexts.clear()
+  }
+
+  private outputSummary() {
+    this.log('minimal', 'summary', `Vue files scanned=${this.metrics.scannedVue} updated=${this.metrics.updatedVue} skipped=${this.metrics.skippedVue} chinese=${this.metrics.chineseVue} newKeys=${this.metrics.newKeys}`)
   }
 
   private loadTranslationsFromMemory(): { [key: string]: { [locale: string]: string } } {
