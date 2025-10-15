@@ -137,13 +137,6 @@ export interface TransformerOptions {
   semicolons?: boolean;
   quotes?: 'single' | 'double';
   globalFunctionName?: string; // 全局i18n函数名，用于props等不能使用this的地方
-  /**
-   * 包裹策略
-   * existing: 仅当该中文已在翻译表里存在（旧逻辑，保守）
-   * all: 任何出现的中文都包裹（激进）
-   * @default 'existing'
-   */
-  wrapStrategy?: 'existing' | 'all';
 }
 
 // 定义babel插件的类型

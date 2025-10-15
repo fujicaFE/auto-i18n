@@ -76,12 +76,10 @@ export class Transformer {
   private transformVueTemplate(template: string, translations: Record<string, Record<string, string>>): string {
     let transformedTemplate = template;
 
-    const wrapAll = this.options.wrapStrategy === 'all';
-
     // 1. 处理Vue插值表达式中的字符串 {{ '中文' }} -> {{ $t('中文') }}
     const interpolationRegex = /\{\{\s*'([^']*[\u4e00-\u9fff][^']*)'\s*\}\}/g;
     transformedTemplate = transformedTemplate.replace(interpolationRegex, (match, chineseText) => {
-      if (wrapAll || translations[chineseText]) {
+      if (translations[chineseText]) {
         return `{{ $t('${chineseText}') }}`;
       }
       return match;
@@ -90,7 +88,7 @@ export class Transformer {
     // 2. 处理Vue插值表达式中的双引号字符串 {{ "中文" }} -> {{ $t("中文") }}
     const doubleQuoteInterpolationRegex = /\{\{\s*"([^"]*[\u4e00-\u9fff][^"]*)"\s*\}\}/g;
     transformedTemplate = transformedTemplate.replace(doubleQuoteInterpolationRegex, (match, chineseText) => {
-      if (wrapAll || translations[chineseText]) {
+      if (translations[chineseText]) {
         return `{{ $t("${chineseText}") }}`;
       }
       return match;
@@ -101,7 +99,7 @@ export class Transformer {
     const mixedTextRegex = />([^<]*[\u4e00-\u9fff][^<]*?)(\{\{[^}]*\}\}|<)/g;
     transformedTemplate = transformedTemplate.replace(mixedTextRegex, (match, chineseText, following) => {
       const trimmedText = chineseText.trim();
-      if (trimmedText && !trimmedText.includes('{{') && (wrapAll || translations[trimmedText])) {
+      if (trimmedText && translations[trimmedText] && !trimmedText.includes('{{')) {
         return `>{{ $t('${trimmedText}') }}${following}`;
       }
       return match;
@@ -125,7 +123,7 @@ export class Transformer {
     });
     transformedTemplate = transformedTemplate.replace(directTextRegex, (match, chineseText) => {
       const trimmedText = chineseText.trim();
-      if (trimmedText && !trimmedText.includes('{{') && !trimmedText.includes('$t(') && (wrapAll || translations[trimmedText])) {
+      if (trimmedText && translations[trimmedText] && !trimmedText.includes('{{') && !trimmedText.includes('$t(')) {
         return `>{{ $t('${trimmedText}') }}<`;
       }
       return match;
@@ -135,13 +133,10 @@ export class Transformer {
     // 支持带连字符、以及前缀 : @ v- 等（避免重复处理已绑定）
     const attributeRegex = /([:@]?[-\w]+)=["']([^"']*[\u4e00-\u9fff][^"']*)["']/g;
     transformedTemplate = transformedTemplate.replace(attributeRegex, (match, attrName, chineseText) => {
-      // 已经是绑定表达式或已含 $t 跳过
       if (match.includes('$t(')) return match;
-      // 忽略 class/id/style
       const pureName = attrName.replace(/^[:@]/, '');
       if (['class', 'id', 'style'].includes(pureName)) return match;
-      // 如果本来就是绑定 (: 或 v-bind:) 直接替换值部分
-      if (!(wrapAll || translations[chineseText])) return match;
+      if (!translations[chineseText]) return match;
       if (attrName.startsWith(':')) {
         return `${attrName}="$t('${chineseText}')"`;
       }
@@ -240,9 +235,7 @@ export class Transformer {
         // 替换字符串字面量
         StringLiteral(path: any) {
           const { node, parent } = path;
-          const isChinese = /[\u4e00-\u9fff]/.test(node.value);
-          const wrapAll = self.options.wrapStrategy === 'all';
-          if (isChinese && (wrapAll || translations[node.value])) {
+          if (translations[node.value]) {
             // 如果当前字符串是对象属性的 key ("label": '中文') 这样的 key 位置，不应替换为调用
             if (t.isObjectProperty(parent) && parent.key === node) {
               return;
@@ -297,8 +290,7 @@ export class Transformer {
         // 处理JSX属性中的中文字符串
         JSXAttribute(path: any) {
           const { node } = path;
-          const wrapAll = self.options.wrapStrategy === 'all';
-          if (t.isStringLiteral(node.value) && /[\u4e00-\u9fff]/.test(node.value.value) && (wrapAll || translations[node.value.value])) {
+          if (t.isStringLiteral(node.value) && translations[node.value.value]) {
             // 检查是否需要使用this
             const shouldUseThis = self.isInVueComponentContext(path);
             
@@ -329,8 +321,7 @@ export class Transformer {
         JSXText(path: any) {
           const { node } = path;
           const text = node.value.trim();
-          const wrapAll = self.options.wrapStrategy === 'all';
-          if (text && /[\u4e00-\u9fff]/.test(text) && (wrapAll || translations[text])) {
+          if (text && translations[text]) {
             // 检查是否需要使用this
             const shouldUseThis = self.isInVueComponentContext(path);
             
