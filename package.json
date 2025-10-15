@@ -1,6 +1,6 @@
 {
   "name": "@fujica/auto-i18n",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "A lightweight webpack plugin for automatic extraction and internationalization of Chinese text",
   "main": "lib/index.js",
   "types": "lib/index.d.ts",
@@ -74,6 +74,8 @@
   "bugs": {
     "url": "https://github.com/fujica/auto-i18n/issues"
   },
-  "homepage": "https://github.com/fujica/auto-i18n#readme"
-  ,"publishConfig": {"access": "public"}
+  "homepage": "https://github.com/fujica/auto-i18n#readme",
+  "publishConfig": {
+    "access": "public"
+  }
 }
