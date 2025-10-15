@@ -11,7 +11,7 @@
         show-overflow-tooltip
       ></div>
       <div prop="parkname" :label="$t('车场名称')" show-overflow-tooltip min-width="100"></div>
-  <p>{{ new Date().getFullYear() }} {{ $t('深圳市富士智能股份有限公司 版权所有') }}</p>
+      <p>{{ new Date().getFullYear() }} {{ $t('深圳市富士智能股份有限公司 版权所有') }}</p>
       <h1 class="hero-title">{{ $t('欢迎使用自动国际化插件') }}</h1>
       <p class="hero-subtitle">{{ $t('这是一个演示项目，展示webpack插件如何自动提取和翻译中文文本') }}</p>
       <button class="cta-button" @click="showDemo">{{ $t('开始演示') }}</button>
