@@ -7,13 +7,14 @@
       <input :placeholder="$t('请输入哈哈哈')"></input>
       <div
         v-if="true"
-        :title="shouldpaymoney>{{ $t('0?'免费放行':'紧急放行'"
+        :title="shouldpaymoney>0?'免费放行':'紧急放行'"
         width="800px"
         :close-on-click-modal="false"
         :visible="dialogVisible"
         :class="shouldpaymoney>0?'dlog':'dlog1'"
         @close="dialogVisible = false"
-      >') }}</div>
+      >
+      </div>
       <div
         prop="parkid"
         :label="$t('车场编号')"
