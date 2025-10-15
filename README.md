@@ -81,6 +81,11 @@ new AutoI18nPlugin({
   // Whether to transform Chinese strings to i18n function calls
   transformCode: true,
 
+  // Wrapping strategy for Chinese text in code/templates
+  // 'existing' (default): only wrap when the Chinese text already exists as a key in locale files
+  // 'all': wrap every Chinese occurrence (aggressive, may alter a lot of code on first run)
+  wrapStrategy: 'existing',
+
   // Whether to skip machine translation for texts already existing in locale files
   // Still wraps with $t() in code
   skipExistingTranslation: true,

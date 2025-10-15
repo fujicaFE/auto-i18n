@@ -6,6 +6,15 @@
       <div>{{ false == 1 ? '手动入场' : '手动出场' }}</div>
       <input :placeholder="$t('请输入哈哈哈')"></input>
       <div
+        v-if="true"
+        :title="shouldpaymoney>{{ $t('0?'免费放行':'紧急放行'"
+        width="800px"
+        :close-on-click-modal="false"
+        :visible="dialogVisible"
+        :class="shouldpaymoney>0?'dlog':'dlog1'"
+        @close="dialogVisible = false"
+      >') }}</div>
+      <div
         prop="parkid"
         :label="$t('车场编号')"
         show-overflow-tooltip
