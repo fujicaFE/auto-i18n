@@ -10,7 +10,12 @@ export interface TranslationData {
 }
 export declare class FilePreprocessor {
     private chineseExtractor;
-    constructor(chineseExtractor: ChineseExtractor);
+    private processedFiles;
+    private codeStyle?;
+    constructor(chineseExtractor: ChineseExtractor, codeStyle?: {
+        semicolons?: boolean;
+        quotes?: 'single' | 'double';
+    });
     /**
      * 直接处理Vue文件，修改源文件
      */
@@ -28,4 +33,12 @@ export declare class FilePreprocessor {
      * 从文件系统加载翻译数据
      */
     private loadTranslationsFromMemory;
+    /**
+     * 重置处理状态（用于开发模式）
+     */
+    resetProcessedFiles(): void;
+    /**
+     * 检查文件是否已处理
+     */
+    isFileProcessed(filePath: string, content: string): boolean;
 }

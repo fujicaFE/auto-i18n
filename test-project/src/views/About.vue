@@ -24,7 +24,7 @@
           </div>
           <div class="feature-item">
             <h3>{{ $t('代码自动转换') }}</h3>
-            <p>将中文字符串自动替换为$t()函数调用</p>
+            <p>{{ $t('将中文字符串自动替换为$t()函数调用') }}</p>
           </div>
           <div class="feature-item">
             <h3>{{ $t('预设翻译管理') }}</h3>
@@ -85,7 +85,7 @@
   </div>
 </template>
 
-<script>import { useI18n } from 'vue-i18n';
+<script>
 export default {
   name: 'About',
   data() {

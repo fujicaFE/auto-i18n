@@ -64,6 +64,30 @@ export interface AutoI18nPluginOptions {
    * @default false
    */
   transformEmittedCode?: boolean
+
+  /**
+   * 是否启用生产环境代码分析（emit阶段检测）
+   * 用于分析最终打包产物中的翻译覆盖情况
+   * @default false
+   */
+  enableProductionAnalysis?: boolean;
+
+  /**
+   * 代码风格配置
+   */
+  codeStyle?: {
+    /**
+     * 是否添加分号
+     * @default false
+     */
+    semicolons?: boolean;
+    
+    /**
+     * 引号风格
+     * @default 'single'
+     */
+    quotes?: 'single' | 'double';
+  };
 }
 
 export interface Translation {
@@ -84,8 +108,10 @@ export interface ChineseExtractorOptions {
 }
 
 export interface TransformerOptions {
-  importStatement?: string;
-  functionName?: string
+  functionName?: string;
+  semicolons?: boolean;
+  quotes?: 'single' | 'double';
+  globalFunctionName?: string; // 全局i18n函数名，用于props等不能使用this的地方
 }
 
 // 定义babel插件的类型

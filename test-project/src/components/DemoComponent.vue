@@ -7,7 +7,7 @@
       <div class="text-examples">
         <h4>{{ $t('文本示例') }}</h4>
         <p>{{ message }}</p>
-        <p>当前时间: {{ currentTime }}</p>
+        <p>{{ $t('当前时间:') }}{{ currentTime }}</p>
         <p>{{ getGreeting() }}</p>
       </div>
       
@@ -21,13 +21,13 @@
       <div class="input-examples">
         <h4>{{ $t('输入框示例') }}</h4>
         <input v-model="inputValue" :placeholder="$t('请输入内容')" />
-        <p v-if="inputValue">您输入的内容: {{ inputValue }}</p>
+        <p v-if="inputValue">{{ $t('您输入的内容:') }}{{ inputValue }}</p>
       </div>
     </div>
   </div>
 </template>
 
-<script>import { useI18n } from 'vue-i18n';
+<script>
 export default {
   name: 'DemoComponent',
   data() {

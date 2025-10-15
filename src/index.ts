@@ -35,6 +35,8 @@ class AutoI18nPlugin {
   private processedTexts: Set<string> = new Set()
   private isDevMode: boolean = false
   private compilationCount: number = 0
+  private processedFiles: Set<string> = new Set()
+  private isProcessing: boolean = false
 
   constructor(options: AutoI18nPluginOptions) {
     this.options = {
@@ -46,6 +48,7 @@ class AutoI18nPlugin {
       apiProvider: 'preset',
       sourceLanguage: 'zh',
       targetLanguages: ['en', 'zh-TW'],
+      enableProductionAnalysis: false, // 默认不启用产物分析
       ...options
     }
 
@@ -76,7 +79,7 @@ class AutoI18nPlugin {
     // 初始化新的工具类
     this.renderDetector = new RenderDetector()
     this.codeAnalyzer = new CodeAnalyzer()
-    this.filePreprocessor = new FilePreprocessor(this.chineseExtractor)
+    this.filePreprocessor = new FilePreprocessor(this.chineseExtractor, this.options.codeStyle)
   }
 
   apply(compiler: any) {
@@ -109,85 +112,124 @@ class AutoI18nPlugin {
         // 只处理用户源文件，忽略 node_modules
         if (module.resource && !module.resource.includes('node_modules')) {
           const resourcePath = module.resource
+          
+          // 避免重复处理相同文件
+          if (this.processedFiles.has(resourcePath)) {
+            return
+          }
+          
           const ext = path.extname(resourcePath).toLowerCase()
           
           // 只处理 .vue 和 .js/.ts 文件
           if (ext === '.vue' || ext === '.js' || ext === '.ts') {
             this.processSourceFile(resourcePath)
+            this.processedFiles.add(resourcePath)
           }
         }
       })
 
       // 在所有模块处理完成后进行翻译和保存
-      compilation.hooks.finishModules.tapAsync('AutoI18nPlugin', async (modules: any, callback: Function) => {
-        await this.processCollectedTexts()
-        callback()
+      compilation.hooks.finishModules.tap('AutoI18nPlugin', (modules: any) => {
+        // 异步处理，但不阻塞编译
+        this.processCollectedTexts().catch(error => {
+          console.error('AutoI18nPlugin: Error processing collected texts:', error)
+        })
       })
     })
 
     // 🔥 新增：在编译开始前直接预处理Vue文件
     if (this.options.transformCode) {
-      compiler.hooks.beforeCompile.tapAsync('AutoI18nPlugin', async (params: any, callback: Function) => {
+      compiler.hooks.beforeCompile.tap('AutoI18nPlugin', (params: any) => {
+        // 防止重复处理和循环调用
+        if (this.isProcessing) {
+          console.log('⚠️ AutoI18nPlugin: 已在处理中，跳过本次预处理')
+          return
+        }
+
+        // 只在第一次编译时处理
+        if (this.compilationCount > 0) {
+          console.log('ℹ️ AutoI18nPlugin: 非首次编译，跳过Vue文件预处理')
+          return
+        }
+
         console.log('🚀 AutoI18nPlugin: beforeCompile - 开始直接预处理Vue文件')
         
-        try {
-          await this.filePreprocessor.processVueFilesDirectly(this.options.outputPath)
-          console.log('✅ AutoI18nPlugin: Vue文件直接预处理完成')
-        } catch (error) {
-          console.error('❌ AutoI18nPlugin: Vue文件预处理失败:', error)
-        }
+        this.isProcessing = true
         
-        callback()
+        // 异步处理，但不阻塞编译
+        this.filePreprocessor.processVueFilesDirectly(this.options.outputPath)
+          .then(() => {
+            console.log('✅ AutoI18nPlugin: Vue文件直接预处理完成')
+          })
+          .catch(error => {
+            console.error('❌ AutoI18nPlugin: Vue文件预处理失败:', error)
+          })
+          .finally(() => {
+            this.isProcessing = false
+          })
       })
     }
 
     // 在开发模式下，当编译完成时可以选择性保存翻译文件
     if (this.isDevMode) {
       compiler.hooks.done.tap('AutoI18nPlugin', () => {
+        this.compilationCount++
+        
         // 只在第一次编译完成时处理，避免循环
         if (this.compilationCount === 1 && this.processedTexts.size > 0) {
           console.log(`AutoI18nPlugin: Dev mode - cached ${this.processedTexts.size} translations for potential save`)
+        }
+        
+        // 每次编译完成后重置处理状态（除了第一次）
+        if (this.compilationCount > 1) {
+          this.processedFiles.clear()
+          console.log('🔄 AutoI18nPlugin: 重置文件处理状态以准备下次编译')
         }
       })
     }
 
     // 使用emit钩子来捕获最终生成的代码，包括Vue的render函数
-    compiler.hooks.emit.tap('AutoI18nPlugin', (compilation: any) => {
-      console.log('🎯 AutoI18nPlugin: emit钩子 - 开始分析最终生成的资产')
-      
-      const translations = this.loadTranslationsFromMemory();
-      
-      // 遍历所有生成的资产
-      for (const [filename, asset] of Object.entries(compilation.assets)) {
-        // 只处理JavaScript文件
-        if (filename.endsWith('.js')) {
-          console.log(`📄 AutoI18nPlugin: 分析JavaScript资产 - ${filename}`)
-          
-          // 获取资产的源代码
-          const source = (asset as any).source();
-          
-          if (typeof source === 'string') {
-            // 检查是否包含Vue render函数的特征
-            const renderResult = this.renderDetector.checkForRenderInEmittedCode(source);
+    // 只有在启用生产环境分析时才执行
+    if (this.options.enableProductionAnalysis) {
+      compiler.hooks.emit.tap('AutoI18nPlugin', (compilation: any) => {
+        console.log('🎯 AutoI18nPlugin: emit钩子 - 开始分析最终生成的资产')
+        
+        const translations = this.loadTranslationsFromMemory();
+        
+        // 遍历所有生成的资产
+        for (const [filename, asset] of Object.entries(compilation.assets)) {
+          // 只处理JavaScript文件
+          if (filename.endsWith('.js')) {
+            console.log(`📄 AutoI18nPlugin: 分析JavaScript资产 - ${filename}`)
             
-            if (renderResult.hasRenderFunction) {
-              console.log(`🎨 AutoI18nPlugin: 在 ${filename} 中发现render函数！`)
+            // 获取资产的源代码
+            const source = (asset as any).source();
+            
+            if (typeof source === 'string') {
+              // 检查是否包含Vue render函数的特征
+              const renderResult = this.renderDetector.checkForRenderInEmittedCode(source);
               
-              // 检查render函数中是否包含中文
-              const chineseRegex = /[\u4e00-\u9fff]/;
-              if (chineseRegex.test(source)) {
-                console.log(`🈚 AutoI18nPlugin: ${filename} 中的render函数包含中文文本！`)
+              if (renderResult.hasRenderFunction) {
+                console.log(`🎨 AutoI18nPlugin: 在 ${filename} 中发现render函数！`)
                 
-                // 在这里我们可以进行处理
-                this.codeAnalyzer.processRenderFunctionInEmit(source, filename, translations);
+                // 检查render函数中是否包含中文
+                const chineseRegex = /[\u4e00-\u9fff]/;
+                if (chineseRegex.test(source)) {
+                  console.log(`🈚 AutoI18nPlugin: ${filename} 中的render函数包含中文文本！`)
+                  
+                  // 在这里我们可以进行处理
+                  this.codeAnalyzer.processRenderFunctionInEmit(source, filename, translations);
+                }
               }
             }
           }
         }
-      }
-      
-      console.log('✅ AutoI18nPlugin: emit钩子分析完成')
-    });
+        
+        console.log('✅ AutoI18nPlugin: emit钩子分析完成')
+      });
+    } else {
+      console.log('ℹ️ AutoI18nPlugin: 生产环境分析已禁用 (enableProductionAnalysis: false)')
+    }
   }
 
   private async processSourceFile(filePath: string) {

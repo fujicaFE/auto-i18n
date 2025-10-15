@@ -1,7 +1,10 @@
 <template>
-  <div class="home">{{ $t('<!-- 添加国际化测试组件 -->') }}</I18nTest />
+  <div class="home">
     
     <div class="hero-section">
+      <div :title="'哈哈'">{{ $t('剩余车位：') }}{{ '--' }}</div>
+      <div>{{ false == 1 ? '手动入场' : '手动出场' }}</div>
+      <input :placeholder="$t('请输入哈哈哈')"></input>
       <h1 class="hero-title">{{ $t('欢迎使用自动国际化插件') }}</h1>
       <p class="hero-subtitle">{{ $t('这是一个演示项目，展示webpack插件如何自动提取和翻译中文文本') }}</p>
       <button class="cta-button" @click="showDemo">{{ $t('开始演示') }}</button>
@@ -58,7 +61,7 @@
   </div>
 </template>
 
-<script>import { useI18n } from 'vue-i18n';
+<script>
 import DemoComponent from '@/components/DemoComponent.vue';
 import I18nTest from '@/components/I18nTest.vue';
 
@@ -67,6 +70,12 @@ export default {
   components: {
     DemoComponent,
     I18nTest
+  },
+  props: {
+    placeholder: {
+      type: String,
+      default: i18n.t('请输入车牌号码')
+    }
   },
   data() {
     return {

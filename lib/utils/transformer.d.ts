@@ -21,11 +21,25 @@ export declare class Transformer {
      */
     private escapeRegex;
     /**
+     * 检测源代码的代码风格
+     */
+    private detectCodeStyle;
+    /**
      * 转换 JavaScript 代码
      */
     private transformJavaScript;
     /**
+     * 检查节点是否在Vue组件上下文中（需要使用this.$t）
+     */
+    private isInVueComponentContext;
+    /**
+     * 检查是否在 props 的 default 值中
+     */
+    private isInPropsDefault;
+    /**
      * 检查节点是否已经在i18n函数调用中
      */
     private isInI18nCall;
+    private buildCalleeFromDotted;
+    private matchesGlobalFunctionChain;
 }

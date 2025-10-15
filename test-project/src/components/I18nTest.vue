@@ -3,12 +3,12 @@
     <h2>{{ $t('国际化测试组件') }}</h2>
     <p>{{ $t('硬编码文本: 这段文字不会改变') }}</p>
     <p>i18n文本: {{ $t('首页') }}</p>
-    <p>当前语言: {{ $i18n.locale }}</p>
+    <p>{{ $t('当前语言:') }}{{ $i18n.locale }}</p>
     <button @click="testTranslation">{{ $t('测试翻译') }}</button>
   </div>
 </template>
 
-<script>import { useI18n } from 'vue-i18n';
+<script>
 export default {
   name: 'I18nTest',
   methods: {

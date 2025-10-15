@@ -12,9 +12,12 @@ export interface TranslationData {
 
 export class FilePreprocessor {
   private chineseExtractor: ChineseExtractor
+  private processedFiles: Map<string, string> = new Map() // 文件路径 -> 文件内容哈希
+  private codeStyle?: { semicolons?: boolean; quotes?: 'single' | 'double' }
 
-  constructor(chineseExtractor: ChineseExtractor) {
+  constructor(chineseExtractor: ChineseExtractor, codeStyle?: { semicolons?: boolean; quotes?: 'single' | 'double' }) {
     this.chineseExtractor = chineseExtractor
+    this.codeStyle = codeStyle
   }
 
   /**
@@ -24,6 +27,7 @@ export class FilePreprocessor {
     try {
       const glob = require('glob')
       const fs = require('fs')
+      const crypto = require('crypto')
       
       // 查找所有Vue文件
       const vueFiles = glob.sync('src/**/*.vue', {
@@ -36,12 +40,24 @@ export class FilePreprocessor {
       // 加载翻译数据
       const translations = this.loadTranslationsFromMemory(outputPath)
       
+      let processedCount = 0
+      
       for (const relativeFilePath of vueFiles) {
         const absoluteFilePath = path.resolve(process.cwd(), relativeFilePath)
         
         try {
           // 读取原始文件内容
           const originalContent = fs.readFileSync(absoluteFilePath, 'utf-8')
+          
+          // 计算文件内容哈希
+          const contentHash = crypto.createHash('md5').update(originalContent).digest('hex')
+          
+          // 检查是否已经处理过相同内容的文件
+          if (this.processedFiles.has(absoluteFilePath) && 
+              this.processedFiles.get(absoluteFilePath) === contentHash) {
+            console.log(`⏭️ AutoI18nPlugin: 跳过已处理文件 - ${relativeFilePath}`)
+            continue
+          }
           
           // 检查是否包含中文
           const chineseRegex = /[\u4e00-\u9fff]/
@@ -52,21 +68,34 @@ export class FilePreprocessor {
             const transformedContent = this.transformVueFileContent(originalContent, translations)
             
             if (transformedContent !== originalContent) {
-              // 直接写入文件
-              fs.writeFileSync(absoluteFilePath, transformedContent, 'utf-8')
-              console.log(`✅ AutoI18nPlugin: 已更新文件 - ${relativeFilePath}`)
+              // 只在内容真正改变时才写入文件
+              const transformedHash = crypto.createHash('md5').update(transformedContent).digest('hex')
+              
+              // 避免写入相同内容
+              if (contentHash !== transformedHash) {
+                fs.writeFileSync(absoluteFilePath, transformedContent, 'utf-8')
+                console.log(`✅ AutoI18nPlugin: 已更新文件 - ${relativeFilePath}`)
+                processedCount++
+                
+                // 记录处理过的文件
+                this.processedFiles.set(absoluteFilePath, transformedHash)
+              } else {
+                console.log(`ℹ️ AutoI18nPlugin: 内容无变化 - ${relativeFilePath}`)
+              }
             } else {
               console.log(`ℹ️ AutoI18nPlugin: 无需转换 - ${relativeFilePath}`)
+              this.processedFiles.set(absoluteFilePath, contentHash)
             }
           } else {
             console.log(`⚪ AutoI18nPlugin: 无中文内容 - ${relativeFilePath}`)
+            this.processedFiles.set(absoluteFilePath, contentHash)
           }
         } catch (error) {
           console.error(`❌ AutoI18nPlugin: 处理文件失败 ${relativeFilePath}:`, error)
         }
       }
       
-      console.log(`🎯 AutoI18nPlugin: 文件处理完成`)
+      console.log(`🎯 AutoI18nPlugin: 文件处理完成，实际更新了 ${processedCount} 个文件`)
     } catch (error) {
       console.error('❌ AutoI18nPlugin: processVueFilesDirectly 失败:', error)
     }
@@ -90,7 +119,9 @@ export class FilePreprocessor {
       // 使用专业的Transformer来处理Vue文件
       const { Transformer } = require('./transformer')
       const transformer = new Transformer({
-        functionName: '$t'
+        functionName: '$t',
+        semicolons: this.codeStyle?.semicolons,
+        quotes: this.codeStyle?.quotes
       })
       
       // 转换整个Vue文件（包括模板和脚本部分）
@@ -182,5 +213,23 @@ export class FilePreprocessor {
     }
 
     return translations
+  }
+
+  /**
+   * 重置处理状态（用于开发模式）
+   */
+  resetProcessedFiles(): void {
+    this.processedFiles.clear()
+    console.log('🔄 AutoI18nPlugin: 重置文件处理状态')
+  }
+
+  /**
+   * 检查文件是否已处理
+   */
+  isFileProcessed(filePath: string, content: string): boolean {
+    const crypto = require('crypto')
+    const contentHash = crypto.createHash('md5').update(content).digest('hex')
+    return this.processedFiles.has(filePath) && 
+           this.processedFiles.get(filePath) === contentHash
   }
 }

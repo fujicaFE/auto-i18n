@@ -189,7 +189,7 @@ export class TranslationService {
     // 发送请求
     const response = await axios({
       method: 'post',
-      url: 'https://api.fanyi.baidu.com/api/trans/vip/translate',
+      url: 'http://api.fanyi.baidu.com/api/trans/vip/translate',
       params: {
         q: text,
         from,
