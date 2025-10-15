@@ -85,11 +85,43 @@ new AutoI18nPlugin({
 
   // Logging level: 'silent' | 'minimal' | 'verbose'
   // minimal: only key phase summary logs
-  logLevel: 'minimal'
+  logLevel: 'minimal',
   // Throttle interval (ms) for lifecycle logs (beforeCompile etc.)
   logThrottleMs: 5000
 })
 ```
+
+### Quick Start (Minimal)
+
+```js
+// webpack.config.js
+const AutoI18nPlugin = require('@fujica/auto-i18n')
+
+module.exports = {
+  plugins: [
+    new AutoI18nPlugin({
+      transformCode: true,
+      logLevel: 'minimal'
+    })
+  ]
+}
+```
+
+Build once, then you'll see locale JSON files created under `src/locales/` and a single summary log line (minimal mode) such as:
+
+```
+[auto-i18n:summary] Vue files scanned=12 updated=3 skipped=9 chinese=5 newKeys=2 totalKeys=156
+```
+
+### Release Notes
+
+See [CHANGELOG.md](./CHANGELOG.md) for version history. Version 0.1.0 introduces:
+* Vue SFC template + script Chinese extraction & auto wrapping `$t()`
+* Optional direct source transformation (`transformCode`)
+* Translation batching with skipExistingTranslation optimization
+* Log levels (`silent|minimal|verbose`) + single final summary in minimal mode
+* Key statistics: scanned / updated / skipped / chinese / newKeys / totalKeys
+
 
 ## API Provider Configuration
 
