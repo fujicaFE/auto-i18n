@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.7 - 2025-10-15
+
+### Changed
+- Relax Node.js engine requirement from >=18.0.0 to >=14.18.0 for broader compatibility.
+
+
 ## 0.1.0 - 2025-10-15
 
 Initial public release.
