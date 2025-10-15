@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.1.8 - 2025-10-15
+
+### Changed
+- Transformer now wraps all Chinese text occurrences regardless of whether translations already exist (previous behavior only wrapped keys present in locale files). Ensures first pass captures every Chinese literal (including props default like '阿斯顿发送到').
+
+### Notes
+- Downstream translation saving still governed by `skipExistingTranslation`; wrapping不再依赖已存在翻译。
+- If you prefer旧行为，可在后续版本添加可选策略（planned: wrapStrategy: 'existing' | 'all'）。
+
+
 ## 0.1.7 - 2025-10-15
 
 ### Changed
