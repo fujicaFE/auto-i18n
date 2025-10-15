@@ -1,5 +1,7 @@
 # @fujica/auto-i18n
 
+![Release](https://github.com/fujica/auto-i18n/actions/workflows/release.yml/badge.svg)
+
 A webpack plugin for automatic internationalization of Chinese text in Vue.js projects.
 
 ## Features

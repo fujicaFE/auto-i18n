@@ -75,4 +75,5 @@
     "url": "https://github.com/fujica/auto-i18n/issues"
   },
   "homepage": "https://github.com/fujica/auto-i18n#readme"
+  ,"publishConfig": {"access": "public"}
 }
