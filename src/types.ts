@@ -125,6 +125,13 @@ export interface AutoI18nPluginOptions {
    * @default false
    */
   formatWithPrettier?: boolean;
+
+  /**
+   * 全局 i18n 调用函数名（默认 'window.$t'），用于非 Vue 组件上下文、props default、data 返回对象等无法使用 this.$t 的位置
+   * 示例：globalFunctionName: 'window.AppI18n.translate'
+   * @default 'window.$t'
+   */
+  globalFunctionName?: string;
 }
 
 export interface Translation {

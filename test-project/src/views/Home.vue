@@ -1,34 +1,31 @@
 <template>
   <div class="home">
-    
     <div class="hero-section">
       <div :title="'哈哈'">{{ $t('剩余车位：') }}{{ '--' }}</div>
       <div>{{ false == 1 ? '手动入场' : '手动出场' }}</div>
-      <input :placeholder="$t('请输入哈哈哈')"></input>
+      <input :placeholder="$t('请输入哈哈哈')" />
       <div
         v-if="true"
-        :title="shouldpaymoney>0?'免费放行':'紧急放行'"
+        :title="shouldpaymoney > 0 ? '免费放行' : '紧急放行'"
         width="800px"
         :close-on-click-modal="false"
         :visible="dialogVisible"
-        :class="shouldpaymoney>0?'dlog':'dlog1'"
+        :class="shouldpaymoney > 0 ? 'dlog' : 'dlog1'"
         @close="dialogVisible = false"
-      >
-      </div>
-      <div
-        prop="parkid"
-        :label="$t('车场编号')"
-        show-overflow-tooltip
       ></div>
+      <div prop="parkid" :label="$t('车场编号')" show-overflow-tooltip></div>
+      <div prop="parkid" :label="$t('测试模块C')" show-overflow-tooltip></div>
       <div
-        prop="parkid"
-        :label="$t('测试模块C')"
+        prop="parkname"
+        :label="$t('车场名称')"
         show-overflow-tooltip
+        min-width="100"
       ></div>
-      <div prop="parkname" :label="$t('车场名称')" show-overflow-tooltip min-width="100"></div>
       <p>{{ new Date().getFullYear() }} {{ $t('富士智能') }}</p>
       <h1 class="hero-title">{{ $t('欢迎使用自动国际化插件') }}</h1>
-      <p class="hero-subtitle">{{ $t('这是一个演示项目，展示webpack插件如何自动提取和翻译中文文本') }}</p>
+      <p class="hero-subtitle">
+        {{ $t('这是一个演示项目，展示webpack插件如何自动提取和翻译中文文本') }}
+      </p>
       <button class="cta-button" @click="showDemo">{{ $t('开始演示') }}</button>
     </div>
 
@@ -59,16 +56,32 @@
       <div class="demo-form">
         <div class="form-group">
           <label for="username">{{ $t('用户名:') }}</label>
-          <input type="text" id="username" v-model="demoForm.username" :placeholder="$t('请输入用户名')">
+          <input
+            type="text"
+            id="username"
+            v-model="demoForm.username"
+            :placeholder="$t('请输入用户名')"
+          />
         </div>
         <div class="form-group">
           <label for="password">{{ $t('密码:') }}</label>
-          <input type="password" id="password" v-model="demoForm.password" :placeholder="$t('请输入密码')">
+          <input
+            type="password"
+            id="password"
+            v-model="demoForm.password"
+            :placeholder="$t('请输入密码')"
+          />
         </div>
         <div class="form-actions">
-          <button @click="handleLogin" class="primary-btn">{{ $t('登录') }}</button>
-          <button @click="handleRegister" class="secondary-btn">{{ $t('注册') }}</button>
-          <button @click="handleReset" class="secondary-btn">{{ $t('重置') }}</button>
+          <button @click="handleLogin" class="primary-btn">
+            {{ $t('登录') }}
+          </button>
+          <button @click="handleRegister" class="secondary-btn">
+            {{ $t('注册') }}
+          </button>
+          <button @click="handleReset" class="secondary-btn">
+            {{ $t('重置') }}
+          </button>
         </div>
       </div>
     </div>
@@ -86,66 +99,66 @@
 <script>
 import DemoComponent from '@/components/DemoComponent.vue'
 import I18nTest from '@/components/I18nTest.vue'
-import i18n from '../i18n';
+import i18n from '../i18n'
 
 export default {
   name: 'Home',
   components: {
     DemoComponent,
-    I18nTest
+    I18nTest,
   },
   props: {
     placeholder: {
       type: String,
-      default: i18n.t('请输入车牌号码')
+      default: i18n.t('请输入车牌号码'),
     },
     teststr1: {
       type: String,
-      default: i18n.t('你好阿世界')
+      default: i18n.t('你好阿世界'),
     },
-    teststr2: {
+    tehaha: {
       type: String,
-      default: i18n.t('你好cc')
+      default: i18n.t('你好aa'),
     },
     sas: {
       type: String,
-      default: i18n.t('阿斯顿发送到')
-    }
+      default: i18n.t('阿斯顿发送到'),
+    },
   },
   data() {
     return {
       demoForm: {
         username: '',
-        password: ''
+        password: '',
       },
       showStatus: false,
       statusMessage: '',
-      statusType: 'success'
+      statusType: 'success',
     }
   },
   methods: {
     showDemo() {
-      alert(this.$t("这是一个演示弹窗，展示中文文本的自动国际化！"))
+      alert(this.$t('这是一个演示弹窗，展示中文文本的自动国际化！'))
     },
     handleLogin() {
       if (!this.demoForm.username || !this.demoForm.password) {
-        this.showStatusMessage(this.$t("请填写完整的登录信息"), 'error')
+        this.showStatusMessage(this.$t('请填写完整的登录信息'), 'error')
         return
       }
       this.showStatusMessage(this.$t('登录成功啦'), 'success')
-      console.log(this.$t("用户登录:"), this.demoForm.username)
+      console.log(this.$t('用户登录:'), this.demoForm.username)
     },
     handleRegister() {
       if (!this.demoForm.username) {
-        this.showStatusMessage(this.$t("请先输入用户名"), 'error')
+        this.showStatusMessage(this.$t('请先输入用户名'), 'error')
         return
       }
-      this.showStatusMessage(this.$t("注册功能开发中..."), 'info')
+      this.showStatusMessage(this.$t('注册功能开发中...'), 'info')
     },
     handleReset() {
       this.demoForm.username = ''
       this.demoForm.password = ''
-      this.showStatusMessage(this.$t("表单已重置"), 'info')
+      this.showStatusMessage(this.$t('表单已重置'), 'info')
     },
     showStatusMessage(message, type) {
       this.statusMessage = message
@@ -155,11 +168,11 @@ export default {
       setTimeout(() => {
         this.showStatus = false
       }, 3000)
-    }
+    },
   },
   mounted() {
-    console.log(this.$t("首页组件已加载"))
-  }
+    console.log(this.$t('首页组件已加载'))
+  },
 }
 </script>
 
@@ -206,7 +219,8 @@ export default {
   transform: translateY(-2px);
 }
 
-.features-section, .demo-section {
+.features-section,
+.demo-section {
   margin-bottom: 3rem;
 }
 
@@ -284,7 +298,8 @@ export default {
   flex-wrap: wrap;
 }
 
-.primary-btn, .secondary-btn {
+.primary-btn,
+.secondary-btn {
   padding: 0.75rem 1.5rem;
   border: none;
   border-radius: 5px;
@@ -353,15 +368,15 @@ export default {
   .hero-title {
     font-size: 2rem;
   }
-  
+
   .hero-subtitle {
     font-size: 1rem;
   }
-  
+
   .features-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .form-actions {
     flex-direction: column;
   }

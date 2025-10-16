@@ -49,7 +49,7 @@ new AutoI18nPlugin({
   outputPath: './src/locales',
   
   // Files to exclude (string or RegExp)
-  exclude: [/node_modules/, 'vendor.js'],
+  exclude: [/node_modules/, 'vendor.js'], // 被排除文件既不会被扫描中文，也不会被写回（避免不必要的重写）
   
   // Whether to ignore Chinese text in comments
   ignoreComments: true,
@@ -81,6 +81,13 @@ new AutoI18nPlugin({
   // Whether to transform Chinese strings to i18n function calls
   transformCode: true,
 
+  // Format transformed source using Prettier (semi: false, singleQuote: true 等默认内部配置)
+  formatWithPrettier: true,
+
+  // Global function to use in非Vue组件上下文（纯 JS 文件、data()/props 默认值等场景）
+  // 默认值: 'window.$t'。在 Vue 组件 methods/computed 中仍使用 this.$t。
+  globalFunctionName: 'window.$t',
+
 
   // Whether to skip machine translation for texts already existing in locale files
   // Still wraps with $t() in code
@@ -93,6 +100,66 @@ new AutoI18nPlugin({
   logThrottleMs: 5000
 })
 ```
+
+#### 字段补充说明
+
+- `transformCode`: 为 true 时会尝试把源码里的中文直接替换为 `$t('原文')` 或 `window.$t('原文')` 调用（根据上下文判断）。
+- `globalFunctionName`: 用于非 Vue this 上下文的调用，比如独立的 util.js，或者组件 `data()` 返回对象里的默认值、`props: { title: { default: '中文' } }` 等。可配置成 `i18n.t`、`window.$t`、`myI18n.translate` 等带点的链式名称，插件会自动拆分生成调用表达式。
+- Vue 组件内的 methods / computed / 生命周期钩子中使用 `this.$t()`，其它场景用 `globalFunctionName`。
+- `formatWithPrettier`: 打开后对最终写回的源码做 Prettier 格式化（当前内置 semi=false 去除分号，保证与无分号代码风格一致）。
+- `exclude`: 匹配的文件既不参与中文提取，也不做包裹与写回（构建日志中的 scanned/updated 不包含它们）。
+- 构建日志字段：`scanned`=扫描的 Vue 文件数；`updated`=实际发生写入修改的 Vue 文件数；`skipped`=未修改或已包裹无需重写；`chinese`=本次新增发现的中文片段计数；`newKeys`=新增到 locale 的 key 数；`totalKeys`=当前累积的全部 key 数。
+
+#### 纯 JS 文件示例（使用 globalFunctionName）
+
+```js
+// src/utils/demo.js （非 Vue SFC）
+// 假设 globalFunctionName: 'window.$t'
+
+function greet() {
+  const msg = '欢迎使用自动国际化插件' // 会被替换为 window.$t('欢迎使用自动国际化插件')
+  console.log(msg)
+}
+
+export const labels = {
+  ok: '确认',        // => window.$t('确认')
+  cancel: '取消'     // => window.$t('取消')
+}
+
+export default greet
+```
+
+在上述示例中，由于文件不是典型的 Vue 组件（没有 `export default { name:..., data(){}, ... }` 结构），插件判定其为纯 JS，上下文使用 `globalFunctionName` 进行包裹。
+
+#### 链式 globalFunctionName 示例
+
+如果配置 `globalFunctionName: 'i18n.core.translate'`，源码中中文将产出：
+
+```js
+i18n.core.translate('你好')
+```
+
+插件会自动拆分 `i18n.core.translate` 为多层成员表达式构建调用，不需要手动引入点号解析逻辑。
+
+#### 包裹策略快速总览
+
+| 场景 | 使用的函数 |
+|------|-------------|
+| Vue methods/computed/生命周期钩子 | this.$t('中文') |
+| Vue data() 返回对象 / props.default / 非 this 上下文 | globalFunctionName('中文') |
+| 纯 JS / 工具模块 / 独立脚本 | globalFunctionName('中文') |
+| 模板内文本（<template>） | $t('中文') （由编译阶段自动注入）|
+
+#### 注意
+
+1. `formatWithPrettier` 只对写回的文件生效；已被 `exclude` 的文件不会格式化。
+2. 若文件内容在转换后与原内容一致（已包裹或无中文），插件避免重复写入以减少 HMR 循环。
+3. `skipExistingTranslation` 为 true 时已有 key 不再发起机器翻译，但仍进行包裹保持调用统一。
+4. 如果需要完全跳过某些第三方库或一次性脚本，请使用 `exclude`。
+5. 跨平台路径：插件在匹配时会自动把路径中的 `\\` 转成 `/` 再做字符串或正则测试；推荐：
+  - 使用正则：例如 `/src\/apiV2\//` 或 `/node_modules/`
+  - 字符串片段：`'/src/apiV2/'`、`'node_modules'`
+  - 避免依赖绝对盘符前缀，保持片段匹配可移植性。
 
 ### Quick Start (Minimal)
 

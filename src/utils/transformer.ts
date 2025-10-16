@@ -12,7 +12,7 @@ export class Transformer {
       functionName: '$t',
       semicolons: false, // 默认不添加分号
       quotes: 'single', // 默认使用单引号
-      globalFunctionName: 'i18n.t', // 默认全局函数名
+  globalFunctionName: 'window.$t', // 默认全局函数名改为 window.$t
       ...options
     };
   }
@@ -204,6 +204,9 @@ export class Transformer {
         quotes: this.options.quotes || detected.quotes
       };
 
+      // 预判是否是 Vue 组件：简单启发式，包含 export default 且对象内有 data/methods/computed/mounted 等键
+      const looksLikeVueComponent = /export\s+default\s+\{[\s\S]*?(data\s*\(|methods\s*:|computed\s*:|mounted\s*\()/m.test(source);
+
       const ast = parser.parse(source, {
         sourceType: 'module',
         plugins: ['jsx','typescript','decorators-legacy','classProperties','dynamicImport']
@@ -238,8 +241,12 @@ export class Transformer {
               t.memberExpression(t.thisExpression(), t.identifier(self.options.functionName || '$t')),
               [t.stringLiteral(node.value)]
             );
+          } else if (!looksLikeVueComponent) {
+            // 纯 JS 文件或非 Vue 组件上下文：统一使用全局 i18n.t
+            const callee = self.buildCalleeFromDotted(self.options.globalFunctionName || 'i18n.t');
+            callExpr = t.callExpression(callee, [t.stringLiteral(node.value)]);
           } else {
-            // template script normal context – use $t identifier (spec wants just $t outside methods/props/data)
+            // Vue 但不在 methods/data/props default 中的普通脚本片段：使用 $t
             callExpr = t.callExpression(t.identifier(self.options.functionName || '$t'), [t.stringLiteral(node.value)]);
           }
           path.replaceWith(callExpr);
@@ -261,6 +268,9 @@ export class Transformer {
               t.memberExpression(t.thisExpression(), t.identifier(self.options.functionName || '$t')),
               [t.stringLiteral(raw)]
             );
+          } else if (!looksLikeVueComponent) {
+            const callee = self.buildCalleeFromDotted(self.options.globalFunctionName || 'i18n.t');
+            callExpr = t.callExpression(callee, [t.stringLiteral(raw)]);
           } else {
             callExpr = t.callExpression(t.identifier(self.options.functionName || '$t'), [t.stringLiteral(raw)]);
           }
@@ -281,6 +291,9 @@ export class Transformer {
               t.memberExpression(t.thisExpression(), t.identifier(self.options.functionName || '$t')),
               [t.stringLiteral(text)]
             );
+          } else if (!looksLikeVueComponent) {
+            const callee = self.buildCalleeFromDotted(self.options.globalFunctionName || 'i18n.t');
+            callExpr = t.callExpression(callee, [t.stringLiteral(text)]);
           } else {
             callExpr = t.callExpression(t.identifier(self.options.functionName || '$t'), [t.stringLiteral(text)]);
           }

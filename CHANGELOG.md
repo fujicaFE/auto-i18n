@@ -1,5 +1,28 @@
 # Changelog
 
+## 0.1.10 (Unreleased)
+### Added
+- `exclude` 现已支持跨平台路径归一（统一用 `/` 进行匹配），同时在转换阶段也会跳过写回。
+- 调试日志：开启 `debugExtraction` 时会输出被 exclude 跳过的文件路径。
+
+### Changed
+- README 增加 `globalFunctionName`、`formatWithPrettier`、包裹策略、路径匹配注意事项说明。
+
+### Fixed
+- 之前发布的编译产物缺失 exclude 重写阶段过滤，导致实际项目中排除规则不生效的问题。
+
+### Pending
+- 更多自动化测试覆盖 exclude 行为。
+
+## 0.1.9
+- 默认 `globalFunctionName` 切换为 `window.$t`（源码层面），可在配置中覆盖。
+- 增加 `formatWithPrettier`（无分号 singleQuote 格式）。
+- 写入文件与 locale JSON 时内容未变化会跳过，避免 HMR 循环。
+
+## 0.1.8 及之前
+- 初始自动提取、翻译、包裹核心功能。
+# Changelog
+
 All notable changes to this project will be documented in this file.
 
 ## 0.1.7 - 2025-10-15

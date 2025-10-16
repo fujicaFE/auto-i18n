@@ -61,6 +61,7 @@ class AutoI18nPlugin {
       enableProductionAnalysis: false, // 默认不启用产物分析
       skipExistingTranslation: true,
       formatWithPrettier: false,
+  globalFunctionName: 'window.$t',
       ...options
     }
 
@@ -160,7 +161,7 @@ class AutoI18nPlugin {
           // 翻译完成后统一执行包裹（源码重写）
           await this.transformAllSourceFiles()
           // 二次扫描：捕获第一次未进入 Map 的已包裹或混合中文（例如 你好cc）
-          // await this.rescanForMissingKeys()
+          await this.rescanForMissingKeys()
         } catch (e) {
           console.error('[auto-i18n] finishModules error', e)
         }
@@ -234,38 +235,64 @@ class AutoI18nPlugin {
     const { Transformer } = require('./utils/transformer')
     const transformer = new Transformer({
       functionName: '$t',
-      globalFunctionName: 'i18n.t',
+      globalFunctionName: this.options.globalFunctionName || 'i18n.t',
       quotes: this.options.codeStyle?.quotes || 'single',
       semicolons: false
     })
     const chineseRegex = /[\u4e00-\u9fff]/
+    const excludePatterns = this.options.exclude || []
+    // 规范化路径，统一使用正斜杠，方便跨平台匹配
+    const normalizePath = (fp: string) => fp.replace(/\\/g, '/')
+    const shouldExclude = (filepath: string) => {
+      if (!excludePatterns.length) return false
+      const normalized = normalizePath(filepath)
+      for (const p of excludePatterns) {
+        if (typeof p === 'string') {
+          // 同时测试原始与规范化路径，字符串片段不建议以**开头结尾，这里简单包含匹配
+          if (normalized.includes(p) || filepath.includes(p)) return true
+        } else if (p instanceof RegExp) {
+          if (p.test(normalized) || p.test(filepath)) return true
+        }
+      }
+      return false
+    }
     for (const file of files) {
       try {
         const ext = path.extname(file).toLowerCase()
         const source = fs.readFileSync(file, 'utf-8')
         const base = path.basename(file)
         if (['vue.config.js','webpack.config.js','jest.config.js','tsconfig.json'].includes(base)) continue
+        if (shouldExclude(file)) {
+          if (this.options.debugExtraction) {
+            this.log('minimal', 'exclude', `skip file by exclude: ${file}`)
+          }
+          continue // 跳过 exclude 匹配文件，不重写
+        }
         if (!chineseRegex.test(source) && !/\b\$t\(|i18n\.t\(/.test(source)) continue
         const transformed = transformer.transform(source, translationsMap)
         if (transformed !== source) {
-          let finalCode = transformed
+          let finalCode: any = transformed
           if (this.options.formatWithPrettier) {
             try {
               const prettier = require('prettier')
-              if (ext === '.vue') {
-                finalCode = prettier.format(finalCode, { semi: false, singleQuote: true, parser: 'vue' })
-              } else if (ext === '.ts') {
-                finalCode = prettier.format(finalCode, { semi: false, singleQuote: true, parser: 'typescript' })
-              } else {
-                finalCode = prettier.format(finalCode, { semi: false, singleQuote: true, parser: 'babel' })
-              }
+              const formatOptions = { semi: false, singleQuote: true, parser: ext === '.vue' ? 'vue' : (ext === '.ts' ? 'typescript' : 'babel') }
+              // Prettier 3 的 format 返回 Promise，需要 await
+              const maybePromise = prettier.format(finalCode, formatOptions)
+              finalCode = typeof maybePromise?.then === 'function' ? await maybePromise : maybePromise
             } catch (e:any) {
-              this.log('minimal', 'format', `Prettier 格式化失败: ${e.message}`)
+              this.log('minimal', 'format', `Prettier 格式化失败(${base}): ${e.message}`)
+              finalCode = transformed // 回退原始转换代码
             }
           }
-          fs.writeFileSync(file, finalCode, 'utf-8')
+          if (typeof finalCode !== 'string') {
+            finalCode = String(finalCode)
+          }
+          // 避免开发模式下反复写入触发循环热更新：仅在内容有差异时写
+          if (finalCode !== source) {
+            fs.writeFileSync(file, finalCode, 'utf-8')
+          }
         }
-      } catch (e) {
+      } catch (e:any) {
         console.warn('[auto-i18n] transform file failed', file, e.message)
       }
     }

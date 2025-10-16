@@ -15,7 +15,8 @@ module.exports = {
         exclude: ['/node_modules/', /\.min\.js$/],
         logLevel: 'minimal',
         debugExtraction: true,
-        formatWithPrettier: true
+        formatWithPrettier: true,
+        globalFunctionName: 'i18n.t',
       })
     ]
   }
