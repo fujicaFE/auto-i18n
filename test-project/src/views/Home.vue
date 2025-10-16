@@ -20,8 +20,13 @@
         :label="$t('车场编号')"
         show-overflow-tooltip
       ></div>
+      <div
+        prop="parkid"
+        :label="$t('测试模块C')"
+        show-overflow-tooltip
+      ></div>
       <div prop="parkname" :label="$t('车场名称')" show-overflow-tooltip min-width="100"></div>
-      <p>{{ new Date().getFullYear() }} {{ $t('深圳市富士智能股份有限公司 版权所有') }}</p>
+      <p>{{ new Date().getFullYear() }} {{ $t('富士智能') }}</p>
       <h1 class="hero-title">{{ $t('欢迎使用自动国际化插件') }}</h1>
       <p class="hero-subtitle">{{ $t('这是一个演示项目，展示webpack插件如何自动提取和翻译中文文本') }}</p>
       <button class="cta-button" @click="showDemo">{{ $t('开始演示') }}</button>
@@ -93,9 +98,13 @@ export default {
       type: String,
       default: i18n.t('请输入车牌号码')
     },
-    teststr: {
+    teststr1: {
       type: String,
-      default: ''
+      default: i18n.t('你好阿世界')
+    },
+    teststr2: {
+      type: String,
+      default: i18n.t('你好cc')
     },
     sas: {
       type: String,
@@ -122,7 +131,7 @@ export default {
         this.showStatusMessage(this.$t("请填写完整的登录信息"), 'error');
         return;
       }
-      this.showStatusMessage(this.$t("登录成功！"), 'success');
+      this.showStatusMessage(this.$t('登录成功啦'), 'success');
       console.log(this.$t("用户登录:"), this.demoForm.username);
     },
     handleRegister() {

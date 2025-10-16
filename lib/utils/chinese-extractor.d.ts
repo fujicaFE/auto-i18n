@@ -1,6 +1,7 @@
 import { ChineseExtractorOptions } from '../types';
 export declare class ChineseExtractor {
     private options;
+    private debug;
     constructor(options?: ChineseExtractorOptions);
     /**
      * 从Vue文件中提取所有中文字符串

@@ -113,6 +113,12 @@ export interface AutoI18nPluginOptions {
    * @default true
    */
   skipExistingTranslation?: boolean;
+
+  /**
+   * 调试：输出每个被提取或被过滤的中文字符串原因
+   * @default false
+   */
+  debugExtraction?: boolean;
 }
 
 export interface Translation {
@@ -130,6 +136,7 @@ export interface TranslationServiceOptions {
 
 export interface ChineseExtractorOptions {
   ignoreComments?: boolean
+  debugExtraction?: boolean // 输出调试日志
 }
 
 export interface TransformerOptions {

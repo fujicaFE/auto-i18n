@@ -5,12 +5,14 @@ import { ChineseExtractorOptions, CHINESE_REGEX } from '../types';
 
 export class ChineseExtractor {
   private options: ChineseExtractorOptions;
+  private debug: boolean;
 
   constructor(options: ChineseExtractorOptions = {}) {
     this.options = {
       ignoreComments: true,
       ...options
     };
+    this.debug = !!this.options.debugExtraction;
   }
 
   /**
@@ -37,6 +39,13 @@ export class ChineseExtractor {
 
     // 后处理：过滤掉包含HTML标记或过长的文本
     return results.filter(text => this.isValidChineseText(text));
+    const filtered: string[] = [];
+    for (const text of results) {
+      const valid = this.isValidChineseText(text);
+      if (this.debug) console.log('[extractor][vue][filter]', valid ? 'keep' : 'skip', JSON.stringify(text));
+      if (valid) filtered.push(text);
+    }
+    return filtered;
   }
 
   /**
@@ -82,8 +91,17 @@ export class ChineseExtractor {
     
     // 排除主要包含英文字母和符号的文本
     const chineseCharCount = (text.match(/[\u4e00-\u9fff]/g) || []).length;
+    // 至少两个中文字符
+    if (chineseCharCount < 2) return false;
+    if (chineseCharCount < 2) {
+      if (this.debug) console.log('[extractor][rule] <2 chinese chars', JSON.stringify(text));
+      return false;
+    }
     const totalLength = text.length;
+    // 中文占比太低则忽略
+    if (chineseCharCount / totalLength < 0.1) return false;
     if (chineseCharCount / totalLength < 0.1) {
+      if (this.debug) console.log('[extractor][rule] ratio <0.1', JSON.stringify(text));
       return false;
     }
 
@@ -103,10 +121,7 @@ export class ChineseExtractor {
     while ((match = textContentRegex.exec(template)) !== null) {
       const text = match[1].trim();
       if (text && CHINESE_REGEX.test(text) && !text.includes('\r') && !text.includes('\n')) {
-        // 跳过已经被$t()包装的文本
-        if (/\$t\s*\(/.test(text) || /\{\{\s*\$t\s*\(/.test(text)) {
-          continue;
-        }
+        // 保留已包裹文本，后续统一过滤
         
         if (text.includes('{{')) {
           // 拆分插值，保留纯中文片段
@@ -118,16 +133,18 @@ export class ChineseExtractor {
             }
         } else {
           chineseTexts.add(text);
+          if (this.debug) console.log('[extractor][template-text]', JSON.stringify(text));
         }
       }
     }
 
-    // 2. 提取HTML属性值中的中文
-    const attrValueRegex = /(?:title|placeholder|alt|aria-label|data-[\w-]+)\s*=\s*["']([^"']*[\u4e00-\u9fff][^"']*)["']/gi;
+  // 2. 提取HTML属性值中的中文（扩展支持 label 等常见展示属性）
+  const attrValueRegex = /(?:title|placeholder|label|alt|aria-label|data-[\w-]+)\s*=\s*["']([^"']*[\u4e00-\u9fff][^"']*)["']/gi;
     while ((match = attrValueRegex.exec(template)) !== null) {
       const text = match[1].trim();
       if (text && CHINESE_REGEX.test(text)) {
         chineseTexts.add(text);
+        if (this.debug) console.log('[extractor][attr]', JSON.stringify(text));
       }
     }
 
@@ -137,6 +154,7 @@ export class ChineseExtractor {
       const text = match[2].trim();
       if (text && CHINESE_REGEX.test(text)) {
         chineseTexts.add(text);
+        if (this.debug) console.log('[extractor][directive]', JSON.stringify(text));
       }
     }
 
@@ -146,6 +164,7 @@ export class ChineseExtractor {
       const text = match[1].trim();
       if (text && CHINESE_REGEX.test(text) && !text.includes('<') && !text.includes('>')) {
         chineseTexts.add(text);
+        if (this.debug) console.log('[extractor][template-string]', JSON.stringify(text));
       }
     }
 
@@ -164,8 +183,21 @@ export class ChineseExtractor {
           const text = interpolationMatch[1].trim();
           if (text && CHINESE_REGEX.test(text)) {
             chineseTexts.add(text);
+            if (this.debug) console.log('[extractor][interpolation-string]', JSON.stringify(text));
           }
         }
+      }
+    }
+
+    // 6. 捕获已被 $t('文本') 或 i18n.t('文本') 包裹但翻译文件可能缺失的 key
+    const wrappedCallRegex = /(?:\$t|i18n\.t)\(\s*['"]([^'"\n\r]*[\u4e00-\u9fff][^'"\n\r]*)['"]\s*\)/g;
+    let wrappedMatch;
+    while ((wrappedMatch = wrappedCallRegex.exec(template)) !== null) {
+      const txt = wrappedMatch[1].trim();
+      if (txt) chineseTexts.add(txt);
+      if (txt) {
+        chineseTexts.add(txt);
+        if (this.debug) console.log('[extractor][wrapped-call]', JSON.stringify(txt));
       }
     }
 
@@ -232,6 +264,7 @@ export class ChineseExtractor {
           // 检查是否含有中文
           if (CHINESE_REGEX.test(node.value)) {
             chineseTexts.add(node.value);
+            if (this.debug) console.log('[extractor][script-string]', JSON.stringify(node.value));
           }
         },
 
@@ -247,11 +280,11 @@ export class ChineseExtractor {
           // 检查模板字符串中的静态部分是否含有中文
           for (const quasi of node.quasis) {
             if (CHINESE_REGEX.test(quasi.value.raw)) {
-              // 对于模板字面量，我们只提取其中包含中文的部分
               const chineseSegments = this.extractChineseSegments(quasi.value.raw);
               for (const segment of chineseSegments) {
                 if (segment.trim()) {
                   chineseTexts.add(segment);
+                  if (this.debug) console.log('[extractor][script-template-seg]', JSON.stringify(segment));
                 }
               }
             }
@@ -261,16 +294,14 @@ export class ChineseExtractor {
         // 处理JSX文本
         JSXText: (path) => {
           const { node } = path;
-
-          // 检查JSX文本是否含有中文
           if (CHINESE_REGEX.test(node.value)) {
             const trimmed = node.value.trim();
             if (trimmed) {
-              // 对于JSX文本，我们可能需要分割成句子
               const chineseSegments = this.extractChineseSegments(trimmed);
               for (const segment of chineseSegments) {
                 if (segment.trim()) {
                   chineseTexts.add(segment);
+                  if (this.debug) console.log('[extractor][jsx-text]', JSON.stringify(segment));
                 }
               }
             }
@@ -284,9 +315,21 @@ export class ChineseExtractor {
           // 检查JSX属性值是否为字符串字面量并且含有中文
           if (t.isStringLiteral(node.value) && CHINESE_REGEX.test(node.value.value)) {
             chineseTexts.add(node.value.value);
+            if (this.debug) console.log('[extractor][jsx-attr]', JSON.stringify(node.value.value));
           }
         }
       });
+
+      // 捕获 JS 中的 $t('...') / i18n.t('...') 调用里的中文（避免已包裹但未进翻译文件）
+      const wrappedCallRegexJs = /(?:\$t|i18n\.t)\(\s*['"]([^'"\n\r]*[\u4e00-\u9fff][^'"\n\r]*)['"]\s*\)/g;
+      let jsMatch;
+      while ((jsMatch = wrappedCallRegexJs.exec(source)) !== null) {
+        const inner = jsMatch[1].trim();
+        if (inner) {
+          chineseTexts.add(inner);
+          if (this.debug) console.log('[extractor][script-wrapped-call]', JSON.stringify(inner));
+        }
+      }
 
     } catch (error) {
       console.error(`解析文件失败 ${filePath || '未知文件'}:`, error);

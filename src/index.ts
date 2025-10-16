@@ -36,11 +36,9 @@ class AutoI18nPlugin {
   private isDevMode: boolean = false
   private compilationCount: number = 0
   private processedFiles: Set<string> = new Set()
-  private isProcessing: boolean = false
   private translationsProcessed: boolean = false
   private logLevel: 'silent' | 'minimal' | 'verbose'
   private logThrottleMs: number
-  private lastBeforeCompileLog = 0
   private metrics: {
     scannedVue: number;
     updatedVue: number;
@@ -48,7 +46,6 @@ class AutoI18nPlugin {
     chineseVue: number;
     newKeys: number;
   } = { scannedVue: 0, updatedVue: 0, skippedVue: 0, chineseVue: 0, newKeys: 0 }
-  private hasPreprocessedVue: boolean = false
 
   constructor(options: AutoI18nPluginOptions) {
     this.options = {
@@ -56,6 +53,7 @@ class AutoI18nPlugin {
       presets: {},
       exclude: [],
       ignoreComments: true,
+      debugExtraction: false,
       apiKey: '',
       apiProvider: 'preset',
       sourceLanguage: 'zh',
@@ -86,7 +84,8 @@ class AutoI18nPlugin {
       sourceLanguage
     )
     this.chineseExtractor = new ChineseExtractor({
-      ignoreComments: this.options.ignoreComments
+      ignoreComments: this.options.ignoreComments,
+      debugExtraction: (this.options as any).debugExtraction
     })
     
     // 初始化新的工具类
@@ -143,103 +142,40 @@ class AutoI18nPlugin {
 
     // 在编译开始前处理源文件，而不是处理编译后的资产
     compiler.hooks.compilation.tap('AutoI18nPlugin', (compilation: any) => {
-
-      // 使用 buildModule 钩子处理每个模块
+      // 每次编译都重新收集（processedFiles 仅用于当前编译周期去重）
       compilation.hooks.buildModule.tap('AutoI18nPlugin', (module: any) => {
-        // 只处理用户源文件，忽略 node_modules
-        if (module.resource && !module.resource.includes('node_modules')) {
-          const resourcePath = module.resource
-          
-          // 避免重复处理相同文件
-          if (this.processedFiles.has(resourcePath)) {
-            return
-          }
-          
-          const ext = path.extname(resourcePath).toLowerCase()
-          
-          // 只处理 .vue 和 .js/.ts 文件
-          if (ext === '.vue' || ext === '.js' || ext === '.ts') {
-            this.processSourceFile(resourcePath)
-            this.processedFiles.add(resourcePath)
-          }
-        }
+        if (!module.resource || module.resource.includes('node_modules')) return
+        const resourcePath = module.resource
+        const ext = path.extname(resourcePath).toLowerCase()
+        if (!['.vue','.js','.ts'].includes(ext)) return
+        if (this.processedFiles.has(resourcePath)) return
+        this.processSourceFile(resourcePath)
+        this.processedFiles.add(resourcePath)
       })
 
-      // 在所有模块处理完成后进行翻译和保存
-      compilation.hooks.finishModules.tap('AutoI18nPlugin', (modules: any) => {
-        // 异步处理，但不阻塞编译
-        this.processCollectedTexts().catch(error => {
-          console.error('AutoI18nPlugin: Error processing collected texts:', error)
-        })
+      compilation.hooks.finishModules.tap('AutoI18nPlugin', async () => {
+        try {
+          await this.processCollectedTexts()
+          // 翻译完成后统一执行包裹（源码重写）
+          await this.transformAllSourceFiles()
+          // 二次扫描：捕获第一次未进入 Map 的已包裹或混合中文（例如 你好cc）
+          // await this.rescanForMissingKeys()
+        } catch (e) {
+          console.error('[auto-i18n] finishModules error', e)
+        }
       })
     })
 
     // 🔥 新增：在编译开始前直接预处理Vue文件
-    if (this.options.transformCode) {
-      compiler.hooks.beforeCompile.tap('AutoI18nPlugin', () => {
-        // 已经处理过（或正在处理）直接跳过，确保只跑一次
-        if (this.hasPreprocessedVue || this.isProcessing) {
-          this.log('verbose', 'lifecycle', '已标记/正在预处理，跳过本次 beforeCompile')
-          return
-        }
-        // 仅首次编译（done 里才会 ++）
-        if (this.compilationCount > 0) {
-          this.log('verbose', 'lifecycle', '非首次编译，跳过预处理')
-          return
-        }
-        this.hasPreprocessedVue = true // 立刻标记，防止短时间多次 beforeCompile 重入
-        this.isProcessing = true
-        if (this.logLevel === 'verbose') {
-          const now = Date.now()
-          if (now - this.lastBeforeCompileLog > this.logThrottleMs) {
-            this.lastBeforeCompileLog = now
-            this.log('minimal', 'lifecycle', 'beforeCompile - 开始直接预处理Vue文件')
-          }
-        }
-
-        this.filePreprocessor.processVueFilesDirectly(this.options.outputPath)
-          .then(stats => {
-            if (stats) {
-              this.metrics.scannedVue += stats.scanned
-              this.metrics.updatedVue += stats.updated
-              this.metrics.skippedVue += stats.skipped
-              this.metrics.chineseVue += stats.chinese
-            }
-            if (this.logLevel === 'verbose') {
-              this.log('minimal', 'lifecycle', 'Vue文件直接预处理完成')
-            }
-          })
-          .catch(error => {
-            console.error('❌ AutoI18nPlugin: Vue文件预处理失败:', error)
-          })
-          .finally(() => {
-            this.isProcessing = false
-          })
-      })
-    }
+    // 移除旧的仅首次 beforeCompile 预处理逻辑；统一在 finishModules 后处理
 
     // 在开发模式下，当编译完成时可以选择性保存翻译文件
-    if (this.isDevMode) {
-      compiler.hooks.done.tap('AutoI18nPlugin', () => {
-        this.compilationCount++
-        
-        // 只在第一次编译完成时处理，避免循环
-        if (this.compilationCount === 1 && this.processedTexts.size > 0) {
-          this.log('verbose', 'dev', `cached ${this.processedTexts.size} translations for potential save`)
-        }
-        
-        // 每次编译完成后重置处理状态（除了第一次）
-        if (this.compilationCount > 1) {
-          this.processedFiles.clear()
-          this.log('verbose', 'dev', '重置文件处理状态以准备下次编译')
-        }
-        // 输出汇总（仅首次 compile 后）
-        if (this.compilationCount === 1) {
-          // 只输出一次最终汇总；所有模式统一在此输出（前面 summaryOnly 已抑制中间日志）
-          this.outputSummary()
-        }
-      })
-    }
+    compiler.hooks.done.tap('AutoI18nPlugin', () => {
+      this.compilationCount++
+      this.processedFiles.clear() // 为下一轮编译重新收集
+      this.translationsProcessed = false // 允许增量新增翻译
+      this.outputSummary()
+    })
 
     // 使用emit钩子来捕获最终生成的代码，包括Vue的render函数
     // 只有在启用生产环境分析时才执行
@@ -285,9 +221,83 @@ class AutoI18nPlugin {
     }
   }
 
+  private async transformAllSourceFiles() {
+    if (!this.options.transformCode) return
+    // 加载最新翻译映射
+    const translationsMap = this.loadTranslationsFromMemory()
+    const fs = require('fs')
+    const glob = require('glob')
+    const root = process.cwd()
+    const files: string[] = glob.sync('**/*.{vue,js,ts}', { cwd: root, absolute: true, ignore: ['**/node_modules/**'] })
+    if (!files.length) return
+    const { Transformer } = require('./utils/transformer')
+    const transformer = new Transformer({
+      functionName: '$t',
+      globalFunctionName: 'i18n.t',
+      quotes: this.options.codeStyle?.quotes || 'single',
+      semicolons: false
+    })
+    const chineseRegex = /[\u4e00-\u9fff]/
+    for (const file of files) {
+      try {
+        const ext = path.extname(file).toLowerCase()
+        const source = fs.readFileSync(file, 'utf-8')
+        const base = path.basename(file)
+        if (['vue.config.js','webpack.config.js','jest.config.js','tsconfig.json'].includes(base)) continue
+        if (!chineseRegex.test(source) && !/\b\$t\(|i18n\.t\(/.test(source)) continue
+        const transformed = transformer.transform(source, translationsMap)
+        if (transformed !== source) fs.writeFileSync(file, transformed, 'utf-8')
+      } catch (e) {
+        console.warn('[auto-i18n] transform file failed', file, e.message)
+      }
+    }
+  }
+
+  private async rescanForMissingKeys() {
+    const fs = require('fs')
+    const glob = require('glob')
+    const root = process.cwd()
+    const files: string[] = glob.sync('**/*.{vue,js,ts}', { cwd: root, absolute: true, ignore: ['**/node_modules/**'] })
+    if (!files.length) return
+    await this.localeFileManager.loadTranslations()
+    const existingSet = new Set<string>()
+    const existingTranslations = this.localeFileManager.getTranslations()
+    for (const tr of existingTranslations) existingSet.add(tr.source)
+    const newlyFound: string[] = []
+    for (const file of files) {
+      try {
+        const content = fs.readFileSync(file, 'utf-8')
+        const chineseTexts = content.includes('<template>') && content.includes('</template>')
+          ? this.chineseExtractor.extractFromVueFile(content)
+          : this.chineseExtractor.extractFromJsFile(content)
+        for (const txt of chineseTexts) {
+          if (!existingSet.has(txt)) {
+            newlyFound.push(txt)
+            existingSet.add(txt)
+          }
+        }
+      } catch {}
+    }
+    if (!newlyFound.length) return
+    this.log('minimal', 'rescan', `found missing chinese keys=${newlyFound.length}`)
+    try {
+      const translations = await this.translationService.translateBatch(newlyFound)
+      this.localeFileManager.addTranslations(translations)
+      this.localeFileManager.saveTranslations(translations)
+      this.log('minimal', 'rescan', 'missing keys saved')
+    } catch (e) {
+      console.error('[auto-i18n] rescan translate error', e)
+    }
+  }
+
   private async processSourceFile(filePath: string) {
     try {
       const fs = require('fs')
+      // 处理可能包含 loader query 的资源路径 (例如 Component.vue?vue&type=script)
+      if (filePath.includes('.vue?')) {
+        const purePath = filePath.split('?')[0]
+        if (fs.existsSync(purePath)) filePath = purePath
+      }
       const source = fs.readFileSync(filePath, 'utf-8')
       const ext = path.extname(filePath).toLowerCase()
 
@@ -298,6 +308,10 @@ class AutoI18nPlugin {
 
       // 添加到集合中
       chineseTexts.forEach((text: string) => this.processedTexts.add(text))
+      if (ext === '.vue') {
+        this.metrics.scannedVue++
+        if (chineseTexts.length) this.metrics.chineseVue++
+      }
     } catch (error) {
       console.error(`AutoI18nPlugin: Error processing source file ${filePath}`, error)
     }
@@ -317,7 +331,6 @@ class AutoI18nPlugin {
   this.log('minimal', 'translate', `new texts: ${newTexts.length}`)
   this.metrics.newKeys += newTexts.length
       if (this.options.skipExistingTranslation !== false) {
-                  this.hasPreprocessedVue = true
         try {
           newlyTranslated = await this.translationService.translateBatch(newTexts)
           this.localeFileManager.addTranslations(newlyTranslated)

@@ -33,6 +33,10 @@ export declare class Transformer {
      */
     private isInVueComponentContext;
     /**
+     * 检查是否位于 data() 方法返回对象的上下文（此处需使用全局 i18n.t）
+     */
+    private isInDataFunction;
+    /**
      * 检查是否在 props 的 default 值中
      */
     private isInPropsDefault;
