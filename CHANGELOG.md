@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.10 (Unreleased)
+## 0.1.11
 ### Added
 - `exclude` 现已支持跨平台路径归一（统一用 `/` 进行匹配），同时在转换阶段也会跳过写回。
 - 调试日志：开启 `debugExtraction` 时会输出被 exclude 跳过的文件路径。

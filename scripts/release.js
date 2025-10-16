@@ -96,7 +96,13 @@ function main() {
   writeJSON(pkgPath, pkg)
   updateChangelog(newVersion)
 
-  run('git add package.json CHANGELOG.md lib')
+  // 若 .gitignore 忽略了 lib，需要强制添加编译产物供 tag 溯源
+  run('git add package.json CHANGELOG.md')
+  try {
+    run('git add -f lib')
+  } catch (e) {
+    console.warn('强制添加 lib 目录失败，可检查 .gitignore 或使用 npm pack 验证内容。')
+  }
   run(`git commit -m "chore: release v${newVersion}"`)
   run(`git tag v${newVersion}`)
 
