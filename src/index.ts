@@ -60,6 +60,7 @@ class AutoI18nPlugin {
       targetLanguages: ['en', 'zh-TW'],
       enableProductionAnalysis: false, // 默认不启用产物分析
       skipExistingTranslation: true,
+      formatWithPrettier: false,
       ...options
     }
 
@@ -246,7 +247,24 @@ class AutoI18nPlugin {
         if (['vue.config.js','webpack.config.js','jest.config.js','tsconfig.json'].includes(base)) continue
         if (!chineseRegex.test(source) && !/\b\$t\(|i18n\.t\(/.test(source)) continue
         const transformed = transformer.transform(source, translationsMap)
-        if (transformed !== source) fs.writeFileSync(file, transformed, 'utf-8')
+        if (transformed !== source) {
+          let finalCode = transformed
+          if (this.options.formatWithPrettier) {
+            try {
+              const prettier = require('prettier')
+              if (ext === '.vue') {
+                finalCode = prettier.format(finalCode, { semi: false, singleQuote: true, parser: 'vue' })
+              } else if (ext === '.ts') {
+                finalCode = prettier.format(finalCode, { semi: false, singleQuote: true, parser: 'typescript' })
+              } else {
+                finalCode = prettier.format(finalCode, { semi: false, singleQuote: true, parser: 'babel' })
+              }
+            } catch (e:any) {
+              this.log('minimal', 'format', `Prettier 格式化失败: ${e.message}`)
+            }
+          }
+          fs.writeFileSync(file, finalCode, 'utf-8')
+        }
       } catch (e) {
         console.warn('[auto-i18n] transform file failed', file, e.message)
       }

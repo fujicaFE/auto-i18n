@@ -107,6 +107,11 @@ export interface AutoI18nPluginOptions {
      * @default false
      */
     debugExtraction?: boolean;
+    /**
+     * 是否在源码转换后使用 Prettier 格式化（统一去除分号、引号等风格）
+     * @default false
+     */
+    formatWithPrettier?: boolean;
 }
 export interface Translation {
     source: string;

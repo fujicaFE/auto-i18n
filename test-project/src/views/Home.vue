@@ -84,8 +84,9 @@
 </template>
 
 <script>
-import DemoComponent from '@/components/DemoComponent.vue';
-import I18nTest from '@/components/I18nTest.vue';
+import DemoComponent from '@/components/DemoComponent.vue'
+import I18nTest from '@/components/I18nTest.vue'
+import i18n from '../i18n';
 
 export default {
   name: 'Home',
@@ -120,46 +121,47 @@ export default {
       showStatus: false,
       statusMessage: '',
       statusType: 'success'
-    };
+    }
   },
   methods: {
     showDemo() {
-      alert(this.$t("这是一个演示弹窗，展示中文文本的自动国际化！"));
+      alert(this.$t("这是一个演示弹窗，展示中文文本的自动国际化！"))
     },
     handleLogin() {
       if (!this.demoForm.username || !this.demoForm.password) {
-        this.showStatusMessage(this.$t("请填写完整的登录信息"), 'error');
-        return;
+        this.showStatusMessage(this.$t("请填写完整的登录信息"), 'error')
+        return
       }
-      this.showStatusMessage(this.$t('登录成功啦'), 'success');
-      console.log(this.$t("用户登录:"), this.demoForm.username);
+      this.showStatusMessage(this.$t('登录成功啦'), 'success')
+      console.log(this.$t("用户登录:"), this.demoForm.username)
     },
     handleRegister() {
       if (!this.demoForm.username) {
-        this.showStatusMessage(this.$t("请先输入用户名"), 'error');
-        return;
+        this.showStatusMessage(this.$t("请先输入用户名"), 'error')
+        return
       }
-      this.showStatusMessage(this.$t("注册功能开发中..."), 'info');
+      this.showStatusMessage(this.$t("注册功能开发中..."), 'info')
     },
     handleReset() {
-      this.demoForm.username = '';
-      this.demoForm.password = '';
-      this.showStatusMessage(this.$t("表单已重置"), 'info');
+      this.demoForm.username = ''
+      this.demoForm.password = ''
+      this.showStatusMessage(this.$t("表单已重置"), 'info')
     },
     showStatusMessage(message, type) {
-      this.statusMessage = message;
-      this.statusType = type;
-      this.showStatus = true;
+      this.statusMessage = message
+      this.statusType = type
+      this.showStatus = true
 
       setTimeout(() => {
-        this.showStatus = false;
-      }, 3000);
+        this.showStatus = false
+      }, 3000)
     }
   },
   mounted() {
-    console.log(this.$t("首页组件已加载"));
+    console.log(this.$t("首页组件已加载"))
   }
-};</script>
+}
+</script>
 
 <style scoped>
 .home {

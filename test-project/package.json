@@ -1,6 +1,6 @@
 {
   "name": "auto-i18n-test-project",
-  "version": "1.0.0",
+  "version": "0.1.8",
   "description": "Test project for auto-i18n webpack plugin",
   "scripts": {
     "serve": "set NODE_OPTIONS=--max-old-space-size=8192 && vue-cli-service serve",

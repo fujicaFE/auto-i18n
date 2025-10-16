@@ -14,7 +14,8 @@ module.exports = {
         ignoreComments: true,
         exclude: ['/node_modules/', /\.min\.js$/],
         logLevel: 'minimal',
-        debugExtraction: true
+        debugExtraction: true,
+        formatWithPrettier: true
       })
     ]
   }
