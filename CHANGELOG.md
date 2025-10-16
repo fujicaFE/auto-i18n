@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.11
+## 0.1.10
 ### Added
 - `exclude` 现已支持跨平台路径归一（统一用 `/` 进行匹配），同时在转换阶段也会跳过写回。
 - 调试日志：开启 `debugExtraction` 时会输出被 exclude 跳过的文件路径。
@@ -21,9 +21,7 @@
 
 ## 0.1.8 及之前
 - 初始自动提取、翻译、包裹核心功能。
-# Changelog
-
-All notable changes to this project will be documented in this file.
+# All notable changes to this project will be documented in this file.
 
 ## 0.1.7 - 2025-10-15
 
