@@ -37,6 +37,7 @@
     "@babel/parser": "^7.14.0",
     "@babel/traverse": "^7.14.0",
     "@babel/types": "^7.14.0",
+    "minimatch": "^9.0.0",
     "axios": "^0.21.1",
     "chinese-conv": "^1.0.1",
     "crypto-js": "^4.0.0",

@@ -207,10 +207,21 @@ export class Transformer {
       // 预判是否是 Vue 组件：简单启发式，包含 export default 且对象内有 data/methods/computed/mounted 等键
       const looksLikeVueComponent = /export\s+default\s+\{[\s\S]*?(data\s*\(|methods\s*:|computed\s*:|mounted\s*\()/m.test(source);
 
-      const ast = parser.parse(source, {
-        sourceType: 'module',
-        plugins: ['jsx','typescript','decorators-legacy','classProperties','dynamicImport']
-      });
+      // 解析阶段加入保护：调试模式下若解析失败直接跳过转换，返回原始源码以避免大量报错循环
+      let ast: any;
+      try {
+        ast = parser.parse(source, {
+          sourceType: 'module',
+          plugins: ['jsx','typescript','decorators-legacy','classProperties','dynamicImport']
+        });
+      } catch (parseErr: any) {
+        // 在 debugExtraction 或 debugHMR 模式下输出精简的跳过日志
+        const debugEnabled = (this.options as any)?.debugHMR || (this.options as any)?.debugExtraction;
+        if (debugEnabled) {
+          console.log('[auto-i18n:parse] skip parse failure, return original source:', parseErr.message);
+        }
+        return source; // 直接返回原始代码，不再尝试转换
+      }
 
       const self = this;
       traverse(ast, {
@@ -227,6 +238,11 @@ export class Transformer {
           if (t.isObjectMethod(parent) && parent.key === node) return;
           if (t.isImportDeclaration(parent) || path.parentPath?.isImportDeclaration()) return;
           if (self.isInI18nCall(path, self.options.functionName || '$t')) return;
+          // 跳过作为比较判定值的中文字符串：避免改变业务逻辑 (例如 url !== '查询视频播放地址失败')
+          if (parent && t.isBinaryExpression(parent) && ['==','===','!=','!=='].includes(parent.operator)) {
+            // 如果当前字面量是比较两侧之一，保持原样
+            return;
+          }
           // 重新使用已计算的 inData/inProps
           const inData = self.isInDataFunction(path);
           const inProps = self.isInPropsDefault(path);
@@ -256,6 +272,7 @@ export class Transformer {
           if (!t.isStringLiteral(node.value)) return;
           const raw = node.value.value;
           if (!translations[raw]) return;
+          // 属性值若处于比较中几乎不会出现，这里不特殊处理；如未来出现可按需扩展
           const inData = self.isInDataFunction(path);
           const inProps = self.isInPropsDefault(path);
           const inVueMethod = self.isInVueComponentContext(path) && !inData && !inProps;

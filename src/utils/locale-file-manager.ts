@@ -154,9 +154,15 @@ export class LocaleFileManager {
         if (shouldWrite) {
           fs.writeFileSync(filePath, newContent, 'utf8');
           console.log(`成功保存翻译文件: ${filePath}`);
+          if ((this as any).pluginOptions?.debugHMR) {
+            const hash = require('crypto').createHash('sha1').update(newContent).digest('hex')
+            console.log(`[auto-i18n:hmr] locale write ${filePath} hash=${hash}`)
+          }
         } else {
-          // 可选：减少噪音，仅 verbose 时输出
-          // console.log(`翻译文件未变化，跳过写入: ${filePath}`)
+          if ((this as any).pluginOptions?.debugHMR) {
+            const hash = require('crypto').createHash('sha1').update(newContent).digest('hex')
+            console.log(`[auto-i18n:hmr] locale skip (no change) ${filePath} hash=${hash}`)
+          }
         }
       } catch (e) {
         console.error(`保存翻译文件失败 ${filePath}:`, e);

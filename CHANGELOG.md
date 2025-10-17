@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased
+### Planned / Ideas
+- 回放模式: dryRun 预览将要包裹的差异。
+- 更多跳过规则配置化 (comparison, switch-case, error sentinel)。
+- 缓存 include 匹配结果提升 watch 性能。
+
+## 0.1.11
+### Added
+- `include` 白名单支持 glob 与 RegExp，三阶段统一生效 (提取/转换/二次扫描)。
+- 新增 `stopWhenComplete` 自动停用插件选项，国际化完成后减少开销。
+- 新增比较跳过：中文字符串用于 `== === != !==` 判定时不转换，避免业务逻辑变更。
+- 解析失败保护：在 debug 模式下解析失败直接跳过转换并输出简洁日志。
+
+### Changed
+- 默认 `transformCode: true`，自动包裹中文更便捷；可显式关闭以仅提取。
+- glob 匹配使用相对路径与 minimatch，兼容 minimatch v9 ESM 导出。
+
+### Fixed
+- 修复 minimatch 导入非函数导致的运行期错误 (TypeError: minimatch is not a function)。
+- 抑制非调试模式下的 AST 解析错误噪音；仅在需要时输出。
+
+### Internal
+- 增加 `matchesInclude()` 封装；返回新增/遗漏 key 计数，用于停用逻辑。
+- 添加比较跳过测试 `comparison-skip.test.ts` (总测试数 25)。
+
+
 ## 0.1.10
 ### Added
 - `exclude` 现已支持跨平台路径归一（统一用 `/` 进行匹配），同时在转换阶段也会跳过写回。

@@ -81,9 +81,19 @@ function updateChangelog(newVersion) {
   const changelogPath = path.resolve('CHANGELOG.md')
   if (!fs.existsSync(changelogPath)) return
   let content = fs.readFileSync(changelogPath, 'utf-8')
-  // 通用 Unreleased 标记替换：## x.y.z (Unreleased) 或 ## Unreleased
-  content = content.replace(/##\s+Unreleased/,'## '+newVersion)
-  content = content.replace(/##\s+([0-9]+\.[0-9]+\.[0-9]+)\s+\(Unreleased\)/, `## ${newVersion}`)
+  const today = new Date()
+  const dateStr = today.toISOString().slice(0,10)
+  // 若存在 Unreleased 段落，将其替换为版本+日期，并插入新的 Unreleased 占位
+  if (/##\s+Unreleased/.test(content)) {
+    content = content.replace(/##\s+Unreleased\n/, `## ${newVersion} - ${dateStr}\n`) // 简单日期格式
+    // 在替换后的版本上方插入新的 Unreleased 占位（若尚未插入过）
+    if (!content.startsWith('# Changelog\n\n## Unreleased')) {
+      content = content.replace('# Changelog', '# Changelog\n\n## Unreleased\n')
+    }
+  } else {
+    // 没有 Unreleased，直接追加版本段落
+    content = content.replace('# Changelog', `# Changelog\n\n## ${newVersion} - ${dateStr}`)
+  }
   fs.writeFileSync(changelogPath, content, 'utf-8')
 }
 

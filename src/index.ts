@@ -46,6 +46,7 @@ class AutoI18nPlugin {
     chineseVue: number;
     newKeys: number;
   } = { scannedVue: 0, updatedVue: 0, skippedVue: 0, chineseVue: 0, newKeys: 0 }
+  private pluginDisabled: boolean = false
 
   constructor(options: AutoI18nPluginOptions) {
     this.options = {
@@ -61,7 +62,9 @@ class AutoI18nPlugin {
       enableProductionAnalysis: false, // 默认不启用产物分析
       skipExistingTranslation: true,
       formatWithPrettier: false,
+      transformCode: true,
   globalFunctionName: 'window.$t',
+      debugHMR: false,
       ...options
     }
 
@@ -85,6 +88,8 @@ class AutoI18nPlugin {
       targetLanguages,
       sourceLanguage
     )
+    // 传递插件配置供 localeFileManager 调试使用
+    ;(this.localeFileManager as any).pluginOptions = this.options
     this.chineseExtractor = new ChineseExtractor({
       ignoreComments: this.options.ignoreComments,
       debugExtraction: (this.options as any).debugExtraction
@@ -104,6 +109,35 @@ class AutoI18nPlugin {
       summaryOnly
     )
     this.logThrottleMs = this.options.logThrottleMs ?? 5000
+  }
+
+  private matchesInclude(filepath: string): boolean {
+    const patterns = this.options.include || []
+    if (!patterns.length) return true
+    let mm = require('minimatch')
+    // 支持 minimatch v9 ESM default 导出
+    if (mm && typeof mm !== 'function' && typeof mm.minimatch === 'function') {
+      mm = mm.minimatch
+    } else if (mm && mm.default && typeof mm.default === 'function') {
+      mm = mm.default
+    }
+    const projectRoot = process.cwd().replace(/\\/g,'/')
+    const normalized = filepath.replace(/\\/g,'/')
+    // 计算相对路径以便按照常规 glob （通常用户写 src/**/*.vue）匹配
+    const relative = normalized.startsWith(projectRoot) ? normalized.slice(projectRoot.length + 1) : normalized
+    for (const p of patterns) {
+      if (typeof p === 'string') {
+        const hasGlob = /[*?\[\]{}]/.test(p)
+        if (hasGlob) {
+          if (mm(relative, p, { dot: true }) || mm(normalized, p, { dot: true })) return true
+        } else {
+          if (relative.includes(p) || normalized.includes(p)) return true
+        }
+      } else if (p instanceof RegExp) {
+        if (p.test(relative) || p.test(normalized)) return true
+      }
+    }
+    return false
   }
 
   private log(level: 'verbose' | 'minimal', domain: string, ...args: any[]) {
@@ -146,10 +180,12 @@ class AutoI18nPlugin {
     compiler.hooks.compilation.tap('AutoI18nPlugin', (compilation: any) => {
       // 每次编译都重新收集（processedFiles 仅用于当前编译周期去重）
       compilation.hooks.buildModule.tap('AutoI18nPlugin', (module: any) => {
+        if (this.pluginDisabled) return
         if (!module.resource || module.resource.includes('node_modules')) return
         const resourcePath = module.resource
         const ext = path.extname(resourcePath).toLowerCase()
         if (!['.vue','.js','.ts'].includes(ext)) return
+        if (!this.matchesInclude(resourcePath)) return
         if (this.processedFiles.has(resourcePath)) return
         this.processSourceFile(resourcePath)
         this.processedFiles.add(resourcePath)
@@ -157,11 +193,14 @@ class AutoI18nPlugin {
 
       compilation.hooks.finishModules.tap('AutoI18nPlugin', async () => {
         try {
-          await this.processCollectedTexts()
-          // 翻译完成后统一执行包裹（源码重写）
+          if (this.pluginDisabled) return
+          const newCount = await this.processCollectedTexts()
           await this.transformAllSourceFiles()
-          // 二次扫描：捕获第一次未进入 Map 的已包裹或混合中文（例如 你好cc）
-          await this.rescanForMissingKeys()
+          const missingCount = await this.rescanForMissingKeys()
+          if (this.options.stopWhenComplete && newCount === 0 && missingCount === 0) {
+            this.pluginDisabled = true
+            this.log('minimal','lifecycle','国际化已完成：没有新增或遗漏中文，自动停止后续处理 (stopWhenComplete=true)')
+          }
         } catch (e) {
           console.error('[auto-i18n] finishModules error', e)
         }
@@ -179,58 +218,61 @@ class AutoI18nPlugin {
       this.outputSummary()
     })
 
-    // 使用emit钩子来捕获最终生成的代码，包括Vue的render函数
-    // 只有在启用生产环境分析时才执行
-    if (this.options.enableProductionAnalysis) {
-      compiler.hooks.emit.tap('AutoI18nPlugin', (compilation: any) => {
-        console.log('🎯 AutoI18nPlugin: emit钩子 - 开始分析最终生成的资产')
+    // // 使用emit钩子来捕获最终生成的代码，包括Vue的render函数
+    // // 只有在启用生产环境分析时才执行
+    // if (this.options.enableProductionAnalysis) {
+    //   compiler.hooks.emit.tap('AutoI18nPlugin', (compilation: any) => {
+    //     console.log('🎯 AutoI18nPlugin: emit钩子 - 开始分析最终生成的资产')
         
-        const translations = this.loadTranslationsFromMemory();
+    //     const translations = this.loadTranslationsFromMemory();
         
-        // 遍历所有生成的资产
-        for (const [filename, asset] of Object.entries(compilation.assets)) {
-          // 只处理JavaScript文件
-          if (filename.endsWith('.js')) {
-            console.log(`📄 AutoI18nPlugin: 分析JavaScript资产 - ${filename}`)
+    //     // 遍历所有生成的资产
+    //     for (const [filename, asset] of Object.entries(compilation.assets)) {
+    //       // 只处理JavaScript文件
+    //       if (filename.endsWith('.js')) {
+    //         console.log(`📄 AutoI18nPlugin: 分析JavaScript资产 - ${filename}`)
             
-            // 获取资产的源代码
-            const source = (asset as any).source();
+    //         // 获取资产的源代码
+    //         const source = (asset as any).source();
             
-            if (typeof source === 'string') {
-              // 检查是否包含Vue render函数的特征
-              const renderResult = this.renderDetector.checkForRenderInEmittedCode(source);
+    //         if (typeof source === 'string') {
+    //           // 检查是否包含Vue render函数的特征
+    //           const renderResult = this.renderDetector.checkForRenderInEmittedCode(source);
               
-              if (renderResult.hasRenderFunction) {
-                console.log(`🎨 AutoI18nPlugin: 在 ${filename} 中发现render函数！`)
+    //           if (renderResult.hasRenderFunction) {
+    //             console.log(`🎨 AutoI18nPlugin: 在 ${filename} 中发现render函数！`)
                 
-                // 检查render函数中是否包含中文
-                const chineseRegex = /[\u4e00-\u9fff]/;
-                if (chineseRegex.test(source)) {
-                  console.log(`🈚 AutoI18nPlugin: ${filename} 中的render函数包含中文文本！`)
+    //             // 检查render函数中是否包含中文
+    //             const chineseRegex = /[\u4e00-\u9fff]/;
+    //             if (chineseRegex.test(source)) {
+    //               console.log(`🈚 AutoI18nPlugin: ${filename} 中的render函数包含中文文本！`)
                   
-                  // 在这里我们可以进行处理
-                  this.codeAnalyzer.processRenderFunctionInEmit(source, filename, translations);
-                }
-              }
-            }
-          }
-        }
+    //               // 在这里我们可以进行处理
+    //               this.codeAnalyzer.processRenderFunctionInEmit(source, filename, translations);
+    //             }
+    //           }
+    //         }
+    //       }
+    //     }
         
-        console.log('✅ AutoI18nPlugin: emit钩子分析完成')
-      });
-    } else {
-      this.log('minimal', 'analysis', '生产环境分析已禁用 (enableProductionAnalysis: false)')
-    }
+    //     console.log('✅ AutoI18nPlugin: emit钩子分析完成')
+    //   });
+    // } else {
+    //   this.log('minimal', 'analysis', '生产环境分析已禁用 (enableProductionAnalysis: false)')
+    // }
   }
 
   private async transformAllSourceFiles() {
     if (!this.options.transformCode) return
+    if (this.pluginDisabled) return
     // 加载最新翻译映射
     const translationsMap = this.loadTranslationsFromMemory()
     const fs = require('fs')
+    const crypto = require('crypto')
     const glob = require('glob')
     const root = process.cwd()
-    const files: string[] = glob.sync('**/*.{vue,js,ts}', { cwd: root, absolute: true, ignore: ['**/node_modules/**'] })
+    let files: string[] = glob.sync('**/*.{vue,js,ts}', { cwd: root, absolute: true, ignore: ['**/node_modules/**'] })
+    files = files.filter(f => this.matchesInclude(f))
     if (!files.length) return
     const { Transformer } = require('./utils/transformer')
     const transformer = new Transformer({
@@ -260,6 +302,7 @@ class AutoI18nPlugin {
       try {
         const ext = path.extname(file).toLowerCase()
         const source = fs.readFileSync(file, 'utf-8')
+        const beforeHash = crypto.createHash('sha1').update(source).digest('hex')
         const base = path.basename(file)
         if (['vue.config.js','webpack.config.js','jest.config.js','tsconfig.json'].includes(base)) continue
         if (shouldExclude(file)) {
@@ -289,8 +332,30 @@ class AutoI18nPlugin {
           }
           // 避免开发模式下反复写入触发循环热更新：仅在内容有差异时写
           if (finalCode !== source) {
+            // debugHMR: 输出差异信息
+            if (this.options.debugHMR) {
+              const afterHash = crypto.createHash('sha1').update(finalCode).digest('hex')
+              const onlyWhitespace = source.replace(/[ \t]+/g,'').replace(/\r?\n/g,'\n') === finalCode.replace(/[ \t]+/g,'').replace(/\r?\n/g,'\n')
+              const logLine = `[HMR] rewrite ${file} before=${beforeHash} after=${afterHash} whitespaceOnly=${onlyWhitespace}`
+              this.log('minimal','hmr', logLine)
+              try {
+                fs.appendFileSync(path.join(root,'auto-i18n-hmr-debug.log'), logLine+"\n")
+              } catch {}
+            }
             fs.writeFileSync(file, finalCode, 'utf-8')
           }
+          else if (this.options.debugHMR) {
+            const skipHash = crypto.createHash('sha1').update(source).digest('hex')
+            const logLine = `[HMR] skip-write identical ${file} hash=${skipHash}`
+            this.log('minimal','hmr', logLine)
+            try { fs.appendFileSync(path.join(root,'auto-i18n-hmr-debug.log'), logLine+"\n") } catch {}
+          }
+        }
+        else if (this.options.debugHMR) {
+          const unchangedHash = crypto.createHash('sha1').update(source).digest('hex')
+          const logLine = `[HMR] no-transform ${file} hash=${unchangedHash}`
+          this.log('minimal','hmr', logLine)
+          try { fs.appendFileSync(path.join(root,'auto-i18n-hmr-debug.log'), logLine+"\n") } catch {}
         }
       } catch (e:any) {
         console.warn('[auto-i18n] transform file failed', file, e.message)
@@ -299,10 +364,12 @@ class AutoI18nPlugin {
   }
 
   private async rescanForMissingKeys() {
+    if (this.pluginDisabled) return 0
     const fs = require('fs')
     const glob = require('glob')
     const root = process.cwd()
-    const files: string[] = glob.sync('**/*.{vue,js,ts}', { cwd: root, absolute: true, ignore: ['**/node_modules/**'] })
+    let files: string[] = glob.sync('**/*.{vue,js,ts}', { cwd: root, absolute: true, ignore: ['**/node_modules/**'] })
+    files = files.filter(f => this.matchesInclude(f))
     if (!files.length) return
     await this.localeFileManager.loadTranslations()
     const existingSet = new Set<string>()
@@ -323,7 +390,7 @@ class AutoI18nPlugin {
         }
       } catch {}
     }
-    if (!newlyFound.length) return
+  if (!newlyFound.length) return 0
     this.log('minimal', 'rescan', `found missing chinese keys=${newlyFound.length}`)
     try {
       const translations = await this.translationService.translateBatch(newlyFound)
@@ -333,6 +400,7 @@ class AutoI18nPlugin {
     } catch (e) {
       console.error('[auto-i18n] rescan translate error', e)
     }
+    return newlyFound.length
   }
 
   private async processSourceFile(filePath: string) {
@@ -362,9 +430,9 @@ class AutoI18nPlugin {
     }
   }
 
-  private async processCollectedTexts() {
+  private async processCollectedTexts(): Promise<number> {
     if (this.translationsProcessed) return
-    if (this.processedTexts.size === 0) return
+    if (this.processedTexts.size === 0) return 0
 
     await this.localeFileManager.loadTranslations()
     const allTexts = Array.from(this.processedTexts)
@@ -396,7 +464,9 @@ class AutoI18nPlugin {
       this.log('minimal', 'translate', `saved locales: keys(total)=${totalKeys} processed=${processedCount} new=${newlyTranslated.length}`)
     }
     this.translationsProcessed = true
+    const newKeyCount = this.metrics.newKeys
     this.processedTexts.clear()
+    return newKeyCount
   }
 
   private outputSummary() {

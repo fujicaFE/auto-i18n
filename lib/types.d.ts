@@ -35,6 +35,13 @@ export interface AutoI18nPluginOptions {
      */
     exclude?: (string | RegExp)[];
     /**
+     * 只处理的文件白名单模式（字符串、RegExp 或 glob）。
+     * 示例(glob)： ['src/**\\/*.vue', 'src/**\\/*.js'] ；示例(RegExp)： /src\\/legacy\\/.*\\.ts$/
+     * 有值时仅匹配的文件会被扫描/转换；未匹配的文件全部跳过。
+     * 优先级：include -> exclude （未命中 include 直接跳过，不再看 exclude）。
+     */
+    include?: (string | RegExp)[];
+    /**
      * 是否忽略注释中的中文
      * @default true
      */
@@ -118,6 +125,18 @@ export interface AutoI18nPluginOptions {
      * @default 'window.$t'
      */
     globalFunctionName?: string;
+    /**
+     * 调试 HMR 写入行为：输出文件重写触发原因、哈希变化、是否仅格式/空白差异等
+     * 开启后将在控制台输出，并追加到项目根目录 auto-i18n-hmr-debug.log
+     * @default false
+     */
+    debugHMR?: boolean;
+    /**
+     * 当检测到本轮编译没有新增翻译 key 且没有遗漏的中文（rescan 也为空）时，自动停止插件后续动作。
+     * 适用于长期 watch 时在国际化完成后降低开销。
+     * @default false
+     */
+    stopWhenComplete?: boolean;
 }
 export interface Translation {
     source: string;

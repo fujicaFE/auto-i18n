@@ -16,11 +16,47 @@
       <div prop="parkid" :label="$t('车场编号')" show-overflow-tooltip></div>
       <div prop="parkid" :label="$t('测试模块C')" show-overflow-tooltip></div>
       <div
+        v-if="a"
         prop="parkname"
         :label="$t('车场名称')"
-        show-overflow-tooltip
-        min-width="100"
+        :disabled="btnDisabled"
+        @click="showDialog('carIn')"
       ></div>
+      <div
+        v-if="a"
+        prop="parkname"
+        :label="$t('车场名称')"
+        :disabled="btnDisabled"
+        @click="showDialog('carIn')"
+      >
+        {{ $t('坦克七号') }}
+        <div class="park-info-btn">
+          <el-button
+            v-if="filterButton('carIn')"
+            :disabled="btnDisabled"
+            @click="showDialog('carIn')"
+            >{{ $t('场内货车') }}</el-button
+          >
+          <el-button
+            v-if="filterButton('carIn')"
+            :disabled="btnDisabled"
+            @click="showDialog('carIn')"
+            >{{ $t('坦克火箭步兵飞机汽车') }}</el-button
+          >
+          <el-button
+            v-if="filterButton('chargeStandard')"
+            :disabled="btnDisabled"
+            @click="showDialog('chargeStandard')"
+            >{{ $t('收费标准') }}</el-button
+          >
+          <el-button
+            v-if="filterButton('moreParkDetail')"
+            :disabled="btnDisabled"
+            @click="showDialog('moreParkDetail')"
+            >{{ $t('更多') }}</el-button
+          >
+        </div>
+      </div>
       <p>{{ new Date().getFullYear() }} {{ $t('富士智能') }}</p>
       <h1 class="hero-title">{{ $t('欢迎使用自动国际化插件') }}</h1>
       <p class="hero-subtitle">
