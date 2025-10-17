@@ -1,6 +1,9 @@
 # Changelog
 
 ## Unreleased
+
+
+## Unreleased
 ### Planned / Ideas
 - 回放模式: dryRun 预览将要包裹的差异。
 - 更多跳过规则配置化 (comparison, switch-case, error sentinel)。
