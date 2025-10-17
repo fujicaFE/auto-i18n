@@ -20,7 +20,15 @@
     "test:integration": "jest integration.test.ts",
     "test:verbose": "jest --verbose",
     "format": "prettier --write \"src/**/*.{ts,js,vue}\" \"test-project/src/**/*.{ts,js,vue}\"",
-    "release": "node scripts/release.js"
+    "release": "node scripts/release.js",
+    "rel": "npm run release",
+    "pub:patch": "node scripts/release.js --bump=patch",
+    "pub:minor": "node scripts/release.js --bump=minor",
+    "pub:major": "node scripts/release.js --bump=major",
+    "pub:set": "node scripts/release.js --set-version",
+    "pub:dry": "node scripts/release.js --dry-run",
+    "pub:skiptest": "node scripts/release.js --skip-tests",
+    "pub:force": "node scripts/release.js --allow-dirty"
   },
   "keywords": [
     "webpack",

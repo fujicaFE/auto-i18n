@@ -9,10 +9,15 @@ A webpack plugin for automatic internationalization of Chinese text in Vue.js pr
 - Automatically extracts Chinese text from your source code
 - Translates Chinese text to English and Traditional Chinese using various translation APIs
 - Supports custom translation presets to override automatic translations
+### Release Automation (简洁命令)
 - Integrates with Vue i18n for seamless internationalization
 - Transforms Chinese strings to $t() function calls (optional)
 - Preserves original Chinese text as comments
 - Configurable logging (logLevel, logThrottleMs) and build summary stats
+- Include whitelist (glob / RegExp / substring) to restrict scanning + transforming
+- Automatic plugin self-disable when translations complete (stopWhenComplete)
+- Debug HMR mode to trace file rewrites and hashes (debugHMR)
+- Safeguard: skip wrapping Chinese literals used only inside equality / inequality comparisons
 
 ## Installation
 
@@ -50,6 +55,14 @@ new AutoI18nPlugin({
   
   // Files to exclude (string or RegExp)
   exclude: [/node_modules/, 'vendor.js'], // 被排除文件既不会被扫描中文，也不会被写回（避免不必要的重写）
+
+  // Files to include (whitelist). If set, only matched files are scanned/transformed.
+  // Supports:
+  //   - Glob patterns: 'src/**/*.vue'
+  //   - Raw substrings: 'src/views/' (case sensitive)
+  //   - RegExp objects: /src\/components\/\w+\.vue/
+  // Example: include: ['src/**/*.vue', 'src/**/*.js', /src\/legacy\//]
+  include: ['src/**/*.vue', 'src/**/*.js'],
   
   // Whether to ignore Chinese text in comments
   ignoreComments: true,
@@ -98,6 +111,12 @@ new AutoI18nPlugin({
   logLevel: 'minimal',
   // Throttle interval (ms) for lifecycle logs (beforeCompile etc.)
   logThrottleMs: 5000
+
+  // Enable enhanced hot-update diagnostics; logs rewrite reasons & file hashes
+  debugHMR: false,
+
+  // Auto stop plugin after a build where no new or missing keys exist
+  stopWhenComplete: false
 })
 ```
 
@@ -108,6 +127,7 @@ new AutoI18nPlugin({
 - Vue 组件内的 methods / computed / 生命周期钩子中使用 `this.$t()`，其它场景用 `globalFunctionName`。
 - `formatWithPrettier`: 打开后对最终写回的源码做 Prettier 格式化（当前内置 semi=false 去除分号，保证与无分号代码风格一致）。
 - `exclude`: 匹配的文件既不参与中文提取，也不做包裹与写回（构建日志中的 scanned/updated 不包含它们）。
+- `include`: 白名单；只处理匹配的文件（glob / RegExp / 字符串部分匹配），为空或未设时表示处理所有。先判定 include，再判定 exclude。
 - 构建日志字段：`scanned`=扫描的 Vue 文件数；`updated`=实际发生写入修改的 Vue 文件数；`skipped`=未修改或已包裹无需重写；`chinese`=本次新增发现的中文片段计数；`newKeys`=新增到 locale 的 key 数；`totalKeys`=当前累积的全部 key 数。
 
 #### 纯 JS 文件示例（使用 globalFunctionName）
@@ -191,6 +211,10 @@ See [CHANGELOG.md](./CHANGELOG.md) for version history. Version 0.1.0 introduces
 * Translation batching with skipExistingTranslation optimization
 * Log levels (`silent|minimal|verbose`) + single final summary in minimal mode
 * Key statistics: scanned / updated / skipped / chinese / newKeys / totalKeys
+* Include whitelist (glob / substring / RegExp) for scope control
+* `stopWhenComplete` auto-disable when no new or missing keys remain
+* `debugHMR` mode for analyzing hot-update & avoiding loops
+* Skip comparison-only Chinese string literals (e.g. `if (code !== '查询视频播放地址失败')` 保留原文避免影响逻辑)
 
 
 ## API Provider Configuration
