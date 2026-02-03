@@ -38,7 +38,7 @@ export declare class Transformer {
      */
     private isInVueComponentContext;
     /**
-     * 检查是否位于 data() 方法返回对象的上下文（此处需使用全局 i18n.t）
+     * 检查是否位于 data() 方法返回对象的上下文（此处需使用全局函数，如 window.$t）
      */
     private isInDataFunction;
     /**

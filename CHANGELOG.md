@@ -3,6 +3,9 @@
 ## Unreleased
 
 
+## 0.1.12 - 2026-02-03
+
+
 ## Unreleased
 ### Planned / Ideas
 - 回放模式: dryRun 预览将要包裹的差异。
