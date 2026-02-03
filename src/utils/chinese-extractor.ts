@@ -2,10 +2,13 @@ import * as parser from '@babel/parser';
 import traverse from '@babel/traverse';
 import * as t from '@babel/types';
 import { ChineseExtractorOptions, CHINESE_REGEX } from '../types';
+import { ExtractionReporter } from './extraction-reporter';
 
 export class ChineseExtractor {
   private options: ChineseExtractorOptions;
   private debug: boolean;
+  private reporter: ExtractionReporter = new ExtractionReporter();
+  private useReporter: boolean = false;
 
   constructor(options: ChineseExtractorOptions = {}) {
     this.options = {
@@ -13,6 +16,23 @@ export class ChineseExtractor {
       ...options
     };
     this.debug = !!this.options.debugExtraction;
+  }
+
+  /**
+   * 启用报告生成
+   */
+  enableReporting(enable: boolean = true) {
+    this.useReporter = enable;
+    if (!enable) {
+      this.reporter.clear();
+    }
+  }
+
+  /**
+   * 获取报告
+   */
+  getReporter(): ExtractionReporter {
+    return this.reporter;
   }
 
   /**
@@ -264,6 +284,9 @@ export class ChineseExtractor {
           // 检查是否含有中文
           if (CHINESE_REGEX.test(node.value)) {
             chineseTexts.add(node.value);
+            if (this.useReporter) {
+              this.reporter.addItem(node.value, 'ast', 'StringLiteral');
+            }
             if (this.debug) console.log('[extractor][script-string]', JSON.stringify(node.value));
           }
         },
@@ -284,6 +307,9 @@ export class ChineseExtractor {
               for (const segment of chineseSegments) {
                 if (segment.trim()) {
                   chineseTexts.add(segment);
+                  if (this.useReporter) {
+                    this.reporter.addItem(segment, 'ast', 'TemplateLiteral');
+                  }
                   if (this.debug) console.log('[extractor][script-template-seg]', JSON.stringify(segment));
                 }
               }
@@ -301,6 +327,9 @@ export class ChineseExtractor {
               for (const segment of chineseSegments) {
                 if (segment.trim()) {
                   chineseTexts.add(segment);
+                  if (this.useReporter) {
+                    this.reporter.addItem(segment, 'ast', 'JSXText');
+                  }
                   if (this.debug) console.log('[extractor][jsx-text]', JSON.stringify(segment));
                 }
               }
@@ -315,6 +344,9 @@ export class ChineseExtractor {
           // 检查JSX属性值是否为字符串字面量并且含有中文
           if (t.isStringLiteral(node.value) && CHINESE_REGEX.test(node.value.value)) {
             chineseTexts.add(node.value.value);
+            if (this.useReporter) {
+              this.reporter.addItem(node.value.value, 'ast', 'JSXAttribute');
+            }
             if (this.debug) console.log('[extractor][jsx-attr]', JSON.stringify(node.value.value));
           }
         }
@@ -359,6 +391,9 @@ export class ChineseExtractor {
         const content = match.slice(1, -1); // 去掉引号
         if (CHINESE_REGEX.test(content)) {
           chineseTexts.add(content);
+          if (this.useReporter) {
+            this.reporter.addItem(content, 'regex', 'StringLiteral');
+          }
         }
       }
     }
@@ -372,6 +407,9 @@ export class ChineseExtractor {
         for (const segment of segments) {
           if (segment.trim()) {
             chineseTexts.add(segment);
+            if (this.useReporter) {
+              this.reporter.addItem(segment, 'regex', 'TemplateLiteral');
+            }
           }
         }
       }

@@ -2,12 +2,13 @@ import path from 'path'
 import { ChineseExtractor } from './utils/chinese-extractor'
 import { TranslationService } from './utils/translation-service'
 import { LocaleFileManager } from './utils/locale-file-manager'
-import { RenderDetector } from './utils/render-detector'
-import { CodeAnalyzer } from './utils/code-analyzer'
 import { FilePreprocessor } from './utils/file-preprocessor'
 import { AutoI18nPluginOptions, Translation } from './types'
 
-// 内置 RawSource 实现，避免依赖 webpack-sources
+/**
+ * 兼容 webpack 4.x 的 RawSource 降级实现
+ * 当无法加载 webpack-sources 时使用此实现
+ */
 class SimpleRawSource {
   _source: string
 
@@ -24,31 +25,64 @@ class SimpleRawSource {
   }
 }
 
+/**
+ * 自动国际化 Webpack 插件
+ * 
+ * 功能：
+ * - 自动扫描中文文本
+ * - 调用翻译 API 生成多语言文件
+ * - 将中文转换为 i18n 函数调用
+ * - 支持预设词汇和翻译缓存
+ */
 class AutoI18nPlugin {
+  // ============ 公开属性 ============
   options: AutoI18nPluginOptions
+
+  // ============ 核心工具类 ============
   translationService: TranslationService
   localeFileManager: LocaleFileManager
   chineseExtractor: ChineseExtractor
-  renderDetector: RenderDetector
-  codeAnalyzer: CodeAnalyzer
   filePreprocessor: FilePreprocessor
+
+  // ============ 内部状态 ============
+  /** 收集到的中文文本集合 */
   private processedTexts: Set<string> = new Set()
+  
+  /** 是否为开发模式 */
   private isDevMode: boolean = false
+  
+  /** 编译次数计数 */
   private compilationCount: number = 0
+  
+  /** 当前编译周期已处理的文件 */
   private processedFiles: Set<string> = new Set()
+  
+  /** 是否已处理翻译 */
   private translationsProcessed: boolean = false
+  
+  /** 日志级别：silent/minimal/verbose */
   private logLevel: 'silent' | 'minimal' | 'verbose'
+  
+  /** 日志节流时间间隔（毫秒） */
   private logThrottleMs: number
+  
+  /** 编译统计指标 */
   private metrics: {
-    scannedVue: number;
-    updatedVue: number;
-    skippedVue: number;
-    chineseVue: number;
-    newKeys: number;
+    scannedVue: number      // 扫描的 Vue 文件数
+    updatedVue: number      // 更新的 Vue 文件数
+    skippedVue: number      // 跳过的 Vue 文件数
+    chineseVue: number      // 包含中文的 Vue 文件数
+    newKeys: number         // 新增翻译键数量
   } = { scannedVue: 0, updatedVue: 0, skippedVue: 0, chineseVue: 0, newKeys: 0 }
+  
+  /** 插件是否已禁用（国际化完成时自动禁用） */
   private pluginDisabled: boolean = false
 
+  /**
+   * 构造函数：初始化插件配置和工具类
+   */
   constructor(options: AutoI18nPluginOptions) {
+    // 合并用户配置和默认配置
     this.options = {
       outputPath: './src/locales',
       presets: {},
@@ -59,22 +93,23 @@ class AutoI18nPlugin {
       apiProvider: 'preset',
       sourceLanguage: 'zh',
       targetLanguages: ['en', 'zh-TW'],
-      enableProductionAnalysis: false, // 默认不启用产物分析
+      enableProductionAnalysis: false,
       skipExistingTranslation: true,
       formatWithPrettier: false,
       transformCode: true,
-  globalFunctionName: 'window.$t',
+      globalFunctionName: 'window.$t',
       debugHMR: false,
       ...options
     }
 
-    // 确保targetLanguages包含sourceLanguage
+    // 确保目标语言列表包含源语言
     const sourceLanguage = this.options.sourceLanguage || 'zh'
     const targetLanguages = this.options.targetLanguages || ['en', 'zh-TW']
     if (!targetLanguages.includes(sourceLanguage)) {
       targetLanguages.unshift(sourceLanguage)
     }
 
+    // 初始化翻译服务
     this.translationService = new TranslationService({
       apiKey: this.options.apiKey,
       apiProvider: this.options.apiProvider,
@@ -83,37 +118,51 @@ class AutoI18nPlugin {
       presets: this.options.presets || {}
     })
 
+    // 初始化语言文件管理器
     this.localeFileManager = new LocaleFileManager(
       this.options.outputPath || './src/locales',
       targetLanguages,
       sourceLanguage
     )
-    // 传递插件配置供 localeFileManager 调试使用
     ;(this.localeFileManager as any).pluginOptions = this.options
+
+    // 初始化中文提取器
     this.chineseExtractor = new ChineseExtractor({
       ignoreComments: this.options.ignoreComments,
       debugExtraction: (this.options as any).debugExtraction
     })
-    
-    // 初始化新的工具类
-    this.renderDetector = new RenderDetector()
-    this.codeAnalyzer = new CodeAnalyzer()
+
+    // 启用提取报告生成（可选）
+    const enableExtractReport = (this.options as any).enableExtractionReport !== false
+    this.chineseExtractor.enableReporting(enableExtractReport)
+
+    // 配置日志系统
     this.logLevel = this.options.logLevel || 'verbose'
-  // summaryOnly: 在非 verbose 模式下，只输出最终汇总
     const summaryOnly = this.logLevel !== 'verbose'
+
+    // 初始化文件预处理器
     this.filePreprocessor = new FilePreprocessor(
       this.chineseExtractor,
       this.options.codeStyle,
       this.logLevel,
-      this.logLevel === 'verbose', // perFileLog 仅在 verbose 下开启
+      this.logLevel === 'verbose',
       summaryOnly
     )
+
     this.logThrottleMs = this.options.logThrottleMs ?? 5000
   }
 
+  // ============ 工具方法 ============
+
+  /**
+   * 检查文件路径是否匹配 include 白名单配置
+   * @param filepath 文件路径
+   * @returns 是否匹配
+   */
   private matchesInclude(filepath: string): boolean {
     const patterns = this.options.include || []
     if (!patterns.length) return true
+
     let mm = require('minimatch')
     // 支持 minimatch v9 ESM default 导出
     if (mm && typeof mm !== 'function' && typeof mm.minimatch === 'function') {
@@ -121,10 +170,14 @@ class AutoI18nPlugin {
     } else if (mm && mm.default && typeof mm.default === 'function') {
       mm = mm.default
     }
-    const projectRoot = process.cwd().replace(/\\/g,'/')
-    const normalized = filepath.replace(/\\/g,'/')
-    // 计算相对路径以便按照常规 glob （通常用户写 src/**/*.vue）匹配
-    const relative = normalized.startsWith(projectRoot) ? normalized.slice(projectRoot.length + 1) : normalized
+
+    const projectRoot = process.cwd().replace(/\\/g, '/')
+    const normalized = filepath.replace(/\\/g, '/')
+    const relative = normalized.startsWith(projectRoot)
+      ? normalized.slice(projectRoot.length + 1)
+      : normalized
+
+    // 逐个检查模式
     for (const p of patterns) {
       if (typeof p === 'string') {
         const hasGlob = /[*?\[\]{}]/.test(p)
@@ -140,6 +193,12 @@ class AutoI18nPlugin {
     return false
   }
 
+  /**
+   * 输出日志
+   * @param level 日志级别
+   * @param domain 日志域名
+   * @param args 日志内容
+   */
   private log(level: 'verbose' | 'minimal', domain: string, ...args: any[]) {
     if (this.logLevel === 'silent') return
     if (this.logLevel === 'minimal' && level === 'verbose') return
@@ -147,6 +206,9 @@ class AutoI18nPlugin {
     console.log(prefix, ...args)
   }
 
+  /**
+   * 仅输出一次的日志（防止重复输出）
+   */
   private logOnceFlag: Set<string> = new Set()
   private logOnce(key: string, level: 'verbose' | 'minimal', domain: string, ...args: any[]) {
     if (this.logOnceFlag.has(key)) return
@@ -154,52 +216,71 @@ class AutoI18nPlugin {
     this.log(level, domain, ...args)
   }
 
+  // ============ Webpack 钩子 ============
+
+  /**
+   * Webpack 插件入口点
+   * 注册各阶段的编译钩子
+   */
   apply(compiler: any) {
     // 检测是否为开发模式
     this.isDevMode = compiler.options.mode === 'development' || compiler.options.watch || !!compiler.watchMode
 
-    // 兼容 webpack 4.x 和 5.x
+    // 兼容 webpack 4.x 和 5.x 的 RawSource
     let RawSource: any
-
     try {
-      // webpack 5.x
       const { webpack } = compiler
       if (webpack && webpack.sources) {
         RawSource = webpack.sources.RawSource
       } else {
-        // webpack 4.x
         RawSource = require('webpack-sources').RawSource
       }
     } catch (error) {
-      // 降级方案，使用我们自己的 SimpleRawSource 实现
       RawSource = SimpleRawSource
       console.warn('AutoI18nPlugin: Could not find webpack-sources. Using fallback RawSource implementation.')
     }
 
-    // 在编译开始前处理源文件，而不是处理编译后的资产
+    // 编译过程中的文件处理
     compiler.hooks.compilation.tap('AutoI18nPlugin', (compilation: any) => {
-      // 每次编译都重新收集（processedFiles 仅用于当前编译周期去重）
+      // 在 buildModule 阶段收集中文文本
       compilation.hooks.buildModule.tap('AutoI18nPlugin', (module: any) => {
         if (this.pluginDisabled) return
         if (!module.resource || module.resource.includes('node_modules')) return
+
         const resourcePath = module.resource
         const ext = path.extname(resourcePath).toLowerCase()
-        if (!['.vue','.js','.ts'].includes(ext)) return
+
+        // 仅处理 Vue/JS/TS 文件
+        if (!['.vue', '.js', '.ts'].includes(ext)) return
         if (!this.matchesInclude(resourcePath)) return
         if (this.processedFiles.has(resourcePath)) return
+
         this.processSourceFile(resourcePath)
         this.processedFiles.add(resourcePath)
       })
 
+      // 在模块处理完成后，进行翻译、转换、扫描
       compilation.hooks.finishModules.tap('AutoI18nPlugin', async () => {
         try {
           if (this.pluginDisabled) return
+
+          // 1. 处理收集到的文本，生成翻译
           const newCount = await this.processCollectedTexts()
+
+          // 2. 转换源文件中的中文为 i18n 调用
           await this.transformAllSourceFiles()
+
+          // 3. 扫描遗漏的中文键
           const missingCount = await this.rescanForMissingKeys()
+
+          // 4. 检查是否可以停止处理
           if (this.options.stopWhenComplete && newCount === 0 && missingCount === 0) {
             this.pluginDisabled = true
-            this.log('minimal','lifecycle','国际化已完成：没有新增或遗漏中文，自动停止后续处理 (stopWhenComplete=true)')
+            this.log(
+              'minimal',
+              'lifecycle',
+              '国际化已完成：没有新增或遗漏中文，自动停止后续处理 (stopWhenComplete=true)'
+            )
           }
         } catch (e) {
           console.error('[auto-i18n] finishModules error', e)
@@ -207,73 +288,55 @@ class AutoI18nPlugin {
       })
     })
 
-    // 🔥 新增：在编译开始前直接预处理Vue文件
-    // 移除旧的仅首次 beforeCompile 预处理逻辑；统一在 finishModules 后处理
-
-    // 在开发模式下，当编译完成时可以选择性保存翻译文件
+    // 编译完成时的清理和汇总
     compiler.hooks.done.tap('AutoI18nPlugin', () => {
       this.compilationCount++
-      this.processedFiles.clear() // 为下一轮编译重新收集
-      this.translationsProcessed = false // 允许增量新增翻译
+      this.processedFiles.clear()           // 为下一轮编译重新收集
+      this.translationsProcessed = false    // 允许增量新增翻译
+      
+      // 保存提取报告
+      this.saveExtractionReport()
+      
       this.outputSummary()
     })
-
-    // // 使用emit钩子来捕获最终生成的代码，包括Vue的render函数
-    // // 只有在启用生产环境分析时才执行
-    // if (this.options.enableProductionAnalysis) {
-    //   compiler.hooks.emit.tap('AutoI18nPlugin', (compilation: any) => {
-    //     console.log('🎯 AutoI18nPlugin: emit钩子 - 开始分析最终生成的资产')
-        
-    //     const translations = this.loadTranslationsFromMemory();
-        
-    //     // 遍历所有生成的资产
-    //     for (const [filename, asset] of Object.entries(compilation.assets)) {
-    //       // 只处理JavaScript文件
-    //       if (filename.endsWith('.js')) {
-    //         console.log(`📄 AutoI18nPlugin: 分析JavaScript资产 - ${filename}`)
-            
-    //         // 获取资产的源代码
-    //         const source = (asset as any).source();
-            
-    //         if (typeof source === 'string') {
-    //           // 检查是否包含Vue render函数的特征
-    //           const renderResult = this.renderDetector.checkForRenderInEmittedCode(source);
-              
-    //           if (renderResult.hasRenderFunction) {
-    //             console.log(`🎨 AutoI18nPlugin: 在 ${filename} 中发现render函数！`)
-                
-    //             // 检查render函数中是否包含中文
-    //             const chineseRegex = /[\u4e00-\u9fff]/;
-    //             if (chineseRegex.test(source)) {
-    //               console.log(`🈚 AutoI18nPlugin: ${filename} 中的render函数包含中文文本！`)
-                  
-    //               // 在这里我们可以进行处理
-    //               this.codeAnalyzer.processRenderFunctionInEmit(source, filename, translations);
-    //             }
-    //           }
-    //         }
-    //       }
-    //     }
-        
-    //     console.log('✅ AutoI18nPlugin: emit钩子分析完成')
-    //   });
-    // } else {
-    //   this.log('minimal', 'analysis', '生产环境分析已禁用 (enableProductionAnalysis: false)')
-    // }
   }
 
+  // ============ 核心处理流程 ============
+
+  /**
+   * 转换所有源文件中的中文为 i18n 调用
+   * 
+   * 流程：
+   * 1. 加载已有翻译映射
+   * 2. 扫描所有 .vue/.js/.ts 文件
+   * 3. 对每个文件进行代码转换（如果包含中文）
+   * 4. 可选：使用 Prettier 进行代码格式化
+   * 5. 写入转换后的代码
+   * 6. 调试模式：记录 HMR 变化日志
+   */
   private async transformAllSourceFiles() {
     if (!this.options.transformCode) return
     if (this.pluginDisabled) return
+
     // 加载最新翻译映射
     const translationsMap = this.loadTranslationsFromMemory()
+
+    // 依赖注入
     const fs = require('fs')
     const crypto = require('crypto')
     const glob = require('glob')
     const root = process.cwd()
-    let files: string[] = glob.sync('**/*.{vue,js,ts}', { cwd: root, absolute: true, ignore: ['**/node_modules/**'] })
+
+    // 扫描所有源文件
+    let files: string[] = glob.sync('**/*.{vue,js,ts}', {
+      cwd: root,
+      absolute: true,
+      ignore: ['**/node_modules/**']
+    })
     files = files.filter(f => this.matchesInclude(f))
     if (!files.length) return
+
+    // 初始化转换器
     const { Transformer } = require('./utils/transformer')
     const transformer = new Transformer({
       functionName: '$t',
@@ -281,16 +344,18 @@ class AutoI18nPlugin {
       quotes: this.options.codeStyle?.quotes || 'single',
       semicolons: false
     })
+
+    // 中文正则表达式
     const chineseRegex = /[\u4e00-\u9fff]/
+
+    // 检查是否应该排除该文件
     const excludePatterns = this.options.exclude || []
-    // 规范化路径，统一使用正斜杠，方便跨平台匹配
     const normalizePath = (fp: string) => fp.replace(/\\/g, '/')
     const shouldExclude = (filepath: string) => {
       if (!excludePatterns.length) return false
       const normalized = normalizePath(filepath)
       for (const p of excludePatterns) {
         if (typeof p === 'string') {
-          // 同时测试原始与规范化路径，字符串片段不建议以**开头结尾，这里简单包含匹配
           if (normalized.includes(p) || filepath.includes(p)) return true
         } else if (p instanceof RegExp) {
           if (p.test(normalized) || p.test(filepath)) return true
@@ -298,90 +363,135 @@ class AutoI18nPlugin {
       }
       return false
     }
+
+    // 处理每个文件
     for (const file of files) {
       try {
         const ext = path.extname(file).toLowerCase()
         const source = fs.readFileSync(file, 'utf-8')
         const beforeHash = crypto.createHash('sha1').update(source).digest('hex')
         const base = path.basename(file)
-        if (['vue.config.js','webpack.config.js','jest.config.js','tsconfig.json'].includes(base)) continue
+
+        // 跳过配置文件
+        if (['vue.config.js', 'webpack.config.js', 'jest.config.js', 'tsconfig.json'].includes(base))
+          continue
+
+        // 检查是否被排除
         if (shouldExclude(file)) {
           if (this.options.debugExtraction) {
             this.log('minimal', 'exclude', `skip file by exclude: ${file}`)
           }
-          continue // 跳过 exclude 匹配文件，不重写
+          continue
         }
-        if (!chineseRegex.test(source) && !/\b\$t\(|i18n\.t\(/.test(source)) continue
+
+        // 快速检查：是否包含中文或已有 i18n 调用
+        if (!chineseRegex.test(source) && !/\b\$t\(|i18n\.t\(/.test(source))
+          continue
+
+        // 执行代码转换
         const transformed = transformer.transform(source, translationsMap)
+
         if (transformed !== source) {
           let finalCode: any = transformed
+
+          // 可选：使用 Prettier 格式化
           if (this.options.formatWithPrettier) {
             try {
               const prettier = require('prettier')
-              const formatOptions = { semi: false, singleQuote: true, parser: ext === '.vue' ? 'vue' : (ext === '.ts' ? 'typescript' : 'babel') }
-              // Prettier 3 的 format 返回 Promise，需要 await
+              const formatOptions = {
+                semi: false,
+                singleQuote: true,
+                parser: ext === '.vue' ? 'vue' : ext === '.ts' ? 'typescript' : 'babel'
+              }
               const maybePromise = prettier.format(finalCode, formatOptions)
               finalCode = typeof maybePromise?.then === 'function' ? await maybePromise : maybePromise
-            } catch (e:any) {
+            } catch (e: any) {
               this.log('minimal', 'format', `Prettier 格式化失败(${base}): ${e.message}`)
-              finalCode = transformed // 回退原始转换代码
+              finalCode = transformed
             }
           }
+
           if (typeof finalCode !== 'string') {
             finalCode = String(finalCode)
           }
-          // 避免开发模式下反复写入触发循环热更新：仅在内容有差异时写
+
+          // 避免开发模式下反复写入触发循环热更新
           if (finalCode !== source) {
-            // debugHMR: 输出差异信息
+            // 调试模式：记录 HMR 变化
             if (this.options.debugHMR) {
               const afterHash = crypto.createHash('sha1').update(finalCode).digest('hex')
-              const onlyWhitespace = source.replace(/[ \t]+/g,'').replace(/\r?\n/g,'\n') === finalCode.replace(/[ \t]+/g,'').replace(/\r?\n/g,'\n')
+              const onlyWhitespace =
+                source.replace(/[ \t]+/g, '').replace(/\r?\n/g, '\n') ===
+                finalCode.replace(/[ \t]+/g, '').replace(/\r?\n/g, '\n')
               const logLine = `[HMR] rewrite ${file} before=${beforeHash} after=${afterHash} whitespaceOnly=${onlyWhitespace}`
-              this.log('minimal','hmr', logLine)
+              this.log('minimal', 'hmr', logLine)
               try {
-                fs.appendFileSync(path.join(root,'auto-i18n-hmr-debug.log'), logLine+"\n")
+                fs.appendFileSync(path.join(root, 'auto-i18n-hmr-debug.log'), logLine + '\n')
               } catch {}
             }
+
+            // 写入转换后的代码
             fs.writeFileSync(file, finalCode, 'utf-8')
-          }
-          else if (this.options.debugHMR) {
+          } else if (this.options.debugHMR) {
             const skipHash = crypto.createHash('sha1').update(source).digest('hex')
             const logLine = `[HMR] skip-write identical ${file} hash=${skipHash}`
-            this.log('minimal','hmr', logLine)
-            try { fs.appendFileSync(path.join(root,'auto-i18n-hmr-debug.log'), logLine+"\n") } catch {}
+            this.log('minimal', 'hmr', logLine)
+            try {
+              fs.appendFileSync(path.join(root, 'auto-i18n-hmr-debug.log'), logLine + '\n')
+            } catch {}
           }
-        }
-        else if (this.options.debugHMR) {
+        } else if (this.options.debugHMR) {
           const unchangedHash = crypto.createHash('sha1').update(source).digest('hex')
           const logLine = `[HMR] no-transform ${file} hash=${unchangedHash}`
-          this.log('minimal','hmr', logLine)
-          try { fs.appendFileSync(path.join(root,'auto-i18n-hmr-debug.log'), logLine+"\n") } catch {}
+          this.log('minimal', 'hmr', logLine)
+          try {
+            fs.appendFileSync(path.join(root, 'auto-i18n-hmr-debug.log'), logLine + '\n')
+          } catch {}
         }
-      } catch (e:any) {
+      } catch (e: any) {
         console.warn('[auto-i18n] transform file failed', file, e.message)
       }
     }
   }
 
+  /**
+   * 扫描遗漏的中文键
+   * 重新扫描所有文件，寻找不在翻译文件中的中文文本
+   * @returns 新发现的中文文本数量
+   */
   private async rescanForMissingKeys() {
     if (this.pluginDisabled) return 0
+
     const fs = require('fs')
     const glob = require('glob')
     const root = process.cwd()
-    let files: string[] = glob.sync('**/*.{vue,js,ts}', { cwd: root, absolute: true, ignore: ['**/node_modules/**'] })
+
+    // 扫描所有源文件
+    let files: string[] = glob.sync('**/*.{vue,js,ts}', {
+      cwd: root,
+      absolute: true,
+      ignore: ['**/node_modules/**']
+    })
     files = files.filter(f => this.matchesInclude(f))
-    if (!files.length) return
+    if (!files.length) return 0
+
+    // 加载现有翻译
     await this.localeFileManager.loadTranslations()
     const existingSet = new Set<string>()
     const existingTranslations = this.localeFileManager.getTranslations()
     for (const tr of existingTranslations) existingSet.add(tr.source)
+
+    // 扫描遗漏的中文
     const newlyFound: string[] = []
     for (const file of files) {
       try {
         const content = fs.readFileSync(file, 'utf-8')
-        const chineseTexts = content.includes('<template>') && content.includes('</template>')
-          ? this.chineseExtractor.extractFromVueFile(content)
-          : this.chineseExtractor.extractFromJsFile(content)
+        const chineseTexts =
+          content.includes('<template>') && content.includes('</template>')
+            ? this.chineseExtractor.extractFromVueFile(content)
+            : this.chineseExtractor.extractFromJsFile(content)
+
+        // 识别新发现的中文
         for (const txt of chineseTexts) {
           if (!existingSet.has(txt)) {
             newlyFound.push(txt)
@@ -390,7 +500,11 @@ class AutoI18nPlugin {
         }
       } catch {}
     }
-  if (!newlyFound.length) return 0
+
+    // 如果没有新发现，直接返回
+    if (!newlyFound.length) return 0
+
+    // 翻译新发现的中文
     this.log('minimal', 'rescan', `found missing chinese keys=${newlyFound.length}`)
     try {
       const translations = await this.translationService.translateBatch(newlyFound)
@@ -400,27 +514,44 @@ class AutoI18nPlugin {
     } catch (e) {
       console.error('[auto-i18n] rescan translate error', e)
     }
+
     return newlyFound.length
   }
 
+  /**
+   * 处理单个源文件：提取中文文本
+   * 
+   * 步骤：
+   * 1. 读取源文件
+   * 2. 根据文件类型调用相应的提取方法
+   * 3. 将提取的中文加入处理集合
+   * 4. 更新统计指标
+   * 
+   * @param filePath 文件路径
+   */
   private async processSourceFile(filePath: string) {
     try {
       const fs = require('fs')
-      // 处理可能包含 loader query 的资源路径 (例如 Component.vue?vue&type=script)
+
+      // 处理可能包含 loader query 的资源路径（如 Component.vue?vue&type=script）
       if (filePath.includes('.vue?')) {
         const purePath = filePath.split('?')[0]
         if (fs.existsSync(purePath)) filePath = purePath
       }
+
       const source = fs.readFileSync(filePath, 'utf-8')
       const ext = path.extname(filePath).toLowerCase()
 
       // 提取中文文本
-      const chineseTexts = ext === '.vue'
-        ? this.chineseExtractor.extractFromVueFile(source)
-        : this.chineseExtractor.extractFromJsFile(source)
+      const chineseTexts =
+        ext === '.vue'
+          ? this.chineseExtractor.extractFromVueFile(source)
+          : this.chineseExtractor.extractFromJsFile(source)
 
-      // 添加到集合中
+      // 添加到待处理集合
       chineseTexts.forEach((text: string) => this.processedTexts.add(text))
+
+      // 更新统计
       if (ext === '.vue') {
         this.metrics.scannedVue++
         if (chineseTexts.length) this.metrics.chineseVue++
@@ -430,19 +561,34 @@ class AutoI18nPlugin {
     }
   }
 
+  /**
+   * 处理收集到的中文文本
+   * 
+   * 流程：
+   * 1. 加载现有翻译
+   * 2. 识别新增中文文本
+   * 3. 调用翻译 API 生成翻译
+   * 4. 保存翻译到本地文件
+   * 
+   * @returns 新增翻译的数量
+   */
   private async processCollectedTexts(): Promise<number> {
-    if (this.translationsProcessed) return
+    if (this.translationsProcessed) return 0
     if (this.processedTexts.size === 0) return 0
 
+    // 加载现有翻译
     await this.localeFileManager.loadTranslations()
     const allTexts = Array.from(this.processedTexts)
 
+    // 识别新增中文
     const newTexts = allTexts.filter(text => !this.localeFileManager.hasTranslation(text))
     let newlyTranslated: Translation[] = []
 
+    // 翻译新增中文
     if (newTexts.length > 0) {
-  this.log('minimal', 'translate', `new texts: ${newTexts.length}`)
-  this.metrics.newKeys += newTexts.length
+      this.log('minimal', 'translate', `new texts: ${newTexts.length}`)
+      this.metrics.newKeys += newTexts.length
+
       if (this.options.skipExistingTranslation !== false) {
         try {
           newlyTranslated = await this.translationService.translateBatch(newTexts)
@@ -453,49 +599,76 @@ class AutoI18nPlugin {
       }
     }
 
-    const existingUsed = this.localeFileManager.getTranslations(allTexts.filter(t => !newTexts.includes(t)))
+    // 收集要保存的翻译（包括新增和已存在的）
+    const existingUsed = this.localeFileManager.getTranslations(
+      allTexts.filter(t => !newTexts.includes(t))
+    )
     const toSave = [...existingUsed, ...newlyTranslated]
 
+    // 保存翻译文件
     if (toSave.length > 0) {
       this.localeFileManager.saveTranslations(toSave)
-      // totalKeys: 当前翻译文件累积总 key 数；processed: 本次涉及（新增+已存在使用）数量
       const totalKeys = this.localeFileManager.getTotalKeyCount()
       const processedCount = toSave.length
-      this.log('minimal', 'translate', `saved locales: keys(total)=${totalKeys} processed=${processedCount} new=${newlyTranslated.length}`)
+      this.log(
+        'minimal',
+        'translate',
+        `saved locales: keys(total)=${totalKeys} processed=${processedCount} new=${newlyTranslated.length}`
+      )
     }
+
     this.translationsProcessed = true
     const newKeyCount = this.metrics.newKeys
     this.processedTexts.clear()
+
     return newKeyCount
   }
 
+  /**
+   * 输出编译汇总信息
+   */
   private outputSummary() {
-    // totalKeys: 当前翻译文件总 key 数（加载后）
     const totalKeys = this.localeFileManager.getTotalKeyCount?.() ?? 0
-    this.log('minimal', 'summary', `Vue files scanned=${this.metrics.scannedVue} updated=${this.metrics.updatedVue} skipped=${this.metrics.skippedVue} chinese=${this.metrics.chineseVue} newKeys=${this.metrics.newKeys} totalKeys=${totalKeys}`)
+    this.log(
+      'minimal',
+      'summary',
+      `Vue files scanned=${this.metrics.scannedVue} updated=${this.metrics.updatedVue} skipped=${this.metrics.skippedVue} chinese=${this.metrics.chineseVue} newKeys=${this.metrics.newKeys} totalKeys=${totalKeys}`
+    )
   }
 
+  /**
+   * 从内存加载已有的翻译映射
+   * 从输出目录读取所有 JSON 语言文件，构建中英文映射
+   * @returns 翻译映射对象 { source: { locale: translation } }
+   */
+  /**
+   * 从内存加载已有的翻译映射
+   * 从输出目录读取所有 JSON 语言文件，构建中英文映射
+   * @returns 翻译映射对象 { source: { locale: translation } }
+   */
   private loadTranslationsFromMemory(): { [key: string]: { [locale: string]: string } } {
     const translations: { [key: string]: { [locale: string]: string } } = {}
-    
+
     try {
       const fs = require('fs')
       const localesDir = path.resolve(this.options.outputPath)
-      
+
       if (!fs.existsSync(localesDir)) {
         return translations
       }
 
+      // 读取所有 JSON 语言文件
       const files = fs.readdirSync(localesDir).filter((file: string) => file.endsWith('.json'))
-      
+
       for (const file of files) {
         const locale = path.basename(file, '.json')
         const filePath = path.join(localesDir, file)
-        
+
         try {
           const content = fs.readFileSync(filePath, 'utf-8')
           const localeTranslations = JSON.parse(content)
-          
+
+          // 合并到翻译映射
           for (const [key, translation] of Object.entries(localeTranslations)) {
             if (!translations[key]) {
               translations[key] = {}
@@ -513,7 +686,27 @@ class AutoI18nPlugin {
     return translations
   }
 
+  /**
+   * 保存提取报告为 HTML 文件
+   */
+  private saveExtractionReport() {
+    try {
+      if (this.compilationCount !== 1) return // 只在第一次编译后生成报告
+
+      const reporter = this.chineseExtractor.getReporter()
+      const report = reporter.getReport()
+
+      // 仅当有提取内容时才生成报告
+      if (report.totalCount === 0) return
+
+      const reportPath = reporter.saveReport(this.options.outputPath || './src/locales')
+      this.log('minimal', 'report', `✅ 提取报告已生成: ${reportPath}`)
+    } catch (error: any) {
+      this.log('minimal', 'report', `⚠️ 生成提取报告失败: ${error.message}`)
+    }
+  }
 }
 
-// CommonJS 模块导出，webpack插件需要这种格式
+// ============ 模块导出 ============
+// CommonJS 格式导出，webpack 插件需要此格式
 module.exports = AutoI18nPlugin

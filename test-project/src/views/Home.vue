@@ -13,6 +13,19 @@
         :class="shouldpaymoney > 0 ? 'dlog' : 'dlog1'"
         @close="dialogVisible = false"
       ></div>
+      <el-form-item :label="$t('密码：')" prop="newPassword">
+        <el-input
+          v-model.trim="resetPasswordForm.newPassword"
+          show-password
+          type="password"
+          clearable
+          :placeholder="$t('请输入新密码')"
+          maxlength="16"
+        />
+        <div class="note">
+          {{ $t('6-16位数字、字母、符号，其中数字、字母、符号至少包含两种') }}
+        </div>
+      </el-form-item>
       <div prop="parkid" :label="$t('车场编号')" show-overflow-tooltip></div>
       <div prop="parkid" :label="$t('测试模块C')" show-overflow-tooltip></div>
       <div

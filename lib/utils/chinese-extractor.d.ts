@@ -1,8 +1,19 @@
 import { ChineseExtractorOptions } from '../types';
+import { ExtractionReporter } from './extraction-reporter';
 export declare class ChineseExtractor {
     private options;
     private debug;
+    private reporter;
+    private useReporter;
     constructor(options?: ChineseExtractorOptions);
+    /**
+     * 启用报告生成
+     */
+    enableReporting(enable?: boolean): void;
+    /**
+     * 获取报告
+     */
+    getReporter(): ExtractionReporter;
     /**
      * 从Vue文件中提取所有中文字符串
      * @param source Vue文件源代码
