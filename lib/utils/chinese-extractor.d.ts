@@ -20,7 +20,7 @@ export declare class ChineseExtractor {
      */
     extractFromVueFile(source: string): string[];
     /**
-     * 检查是否为有效的中文文本（排除HTML标记等）
+     * 检查是否为有效的中文文本（排除HTML标记、正则表达式等）
      */
     private isValidChineseText;
     /**
@@ -43,6 +43,11 @@ export declare class ChineseExtractor {
      * 使用正则表达式方法提取中文（回退方案）
      */
     private extractByRegex;
+    /**
+     * 检查是否为正则表达式模式
+     * 正则中的中文通常是字符集匹配，不应国际化
+     */
+    private isRegexPattern;
     /**
      * 检查节点是否在注释中
      */

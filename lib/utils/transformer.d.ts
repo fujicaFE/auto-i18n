@@ -29,6 +29,11 @@ export declare class Transformer {
      */
     private transformJavaScript;
     /**
+     * 检查字符串是否看起来像正则表达式
+     * 用于避免转换正则表达式字符串中的中文
+     */
+    private looksLikeRegexString;
+    /**
      * 检查节点是否在Vue组件上下文中（需要使用this.$t）
      */
     private isInVueComponentContext;

@@ -36,34 +36,60 @@ export class Transformer {
    */
   private transformVueFile(source: string, translations: Record<string, Record<string, string>>): string {
     try {
-      // 简单的正则匹配来分离 template 和 script 部分
+      // 精确匹配各个部分的起始和结束位置
       const templateMatch = source.match(/<template[^>]*>([\s\S]*?)<\/template>/);
       const scriptMatch = source.match(/<script[^>]*>([\s\S]*?)<\/script>/);
       const styleMatch = source.match(/<style[^>]*>([\s\S]*?)<\/style>/g);
 
-      let transformedSource = source;
+      // 确定各部分的位置
+      const templateStart = templateMatch ? source.indexOf(templateMatch[0]) : -1;
+      const templateEnd = templateStart >= 0 ? templateStart + templateMatch![0].length : -1;
+      const scriptStart = scriptMatch ? source.indexOf(scriptMatch[0]) : -1;
+      const scriptEnd = scriptStart >= 0 ? scriptStart + scriptMatch![0].length : -1;
 
-      // 处理 template 部分
-      if (templateMatch && typeof templateMatch[1] === 'string') {
+      let parts: Array<{ start: number; end: number; content: string }> = [];
+      let lastEnd = 0;
+
+      // 按顺序处理各部分
+      if (templateStart >= 0 && templateMatch) {
+        // template 之前的内容
+        if (templateStart > lastEnd) {
+          parts.push({ start: lastEnd, end: templateStart, content: source.substring(lastEnd, templateStart) });
+        }
+        // 转换 template
         const originalTemplate = templateMatch[1];
         const transformedTemplate = this.transformVueTemplate(originalTemplate, translations);
-        if (transformedTemplate !== originalTemplate) {
-          transformedSource = transformedSource.replace(templateMatch[0], 
-            `<template>${transformedTemplate}</template>`);
-        }
+        parts.push({ 
+          start: templateStart, 
+          end: templateEnd, 
+          content: `<template>${transformedTemplate}</template>` 
+        });
+        lastEnd = templateEnd;
       }
 
-      // 处理 script 部分
-      if (scriptMatch && typeof scriptMatch[1] === 'string') {
+      if (scriptStart >= 0 && scriptMatch) {
+        // script 之前的内容（template 和 script 之间）
+        if (scriptStart > lastEnd) {
+          parts.push({ start: lastEnd, end: scriptStart, content: source.substring(lastEnd, scriptStart) });
+        }
+        // 转换 script
         const originalScript = scriptMatch[1];
         const transformedScript = this.transformJavaScript(originalScript, translations);
-        if (transformedScript !== originalScript) {
-          transformedSource = transformedSource.replace(scriptMatch[0], 
-            `<script>${transformedScript}</script>`);
-        }
+        parts.push({ 
+          start: scriptStart, 
+          end: scriptEnd, 
+          content: `<script>${transformedScript}</script>` 
+        });
+        lastEnd = scriptEnd;
       }
 
-      return transformedSource;
+      // script 之后的内容（包括 style 等）
+      if (lastEnd < source.length) {
+        parts.push({ start: lastEnd, end: source.length, content: source.substring(lastEnd) });
+      }
+
+      // 重组文件
+      return parts.map(p => p.content).join('');
     } catch (error) {
       console.error('转换Vue文件失败:', error);
       return source;
@@ -243,6 +269,21 @@ export class Transformer {
             // 如果当前字面量是比较两侧之一，保持原样
             return;
           }
+          // 跳过 Vue 组件的 name 属性值（export default { name: '组件名' }）
+          if (t.isObjectProperty(parent) && t.isIdentifier(parent.key, { name: 'name' })) {
+            // 检查是否在 export default 中
+            let current = path.parentPath;
+            while (current) {
+              if (current.isExportDefaultDeclaration()) {
+                return; // 跳过组件名
+              }
+              current = current.parentPath;
+            }
+          }
+          // 跳过看起来像正则表达式的字符串
+          if (self.looksLikeRegexString(node.value)) {
+            return;
+          }
           // 重新使用已计算的 inData/inProps
           const inData = self.isInDataFunction(path);
           const inProps = self.isInPropsDefault(path);
@@ -336,6 +377,46 @@ export class Transformer {
       console.error('转换代码失败:', error);
       return source; // 发生错误时返回原始代码
     }
+  }
+
+  /**
+   * 检查字符串是否看起来像正则表达式
+   * 用于避免转换正则表达式字符串中的中文
+   */
+  private looksLikeRegexString(str: string): boolean {
+    // 1. 以 / 开头和结尾，明显是正则字面量字符串形式
+    if (/^\/.*\/[gimsuvy]*$/.test(str)) {
+      return true;
+    }
+    
+    // 2. 包含正则特殊字符和模式
+    const regexPatterns = [
+      /\[.*\]/,           // 字符集 [abc]
+      /\{\d+,?\d*\}/,    // 量词 {n,m}
+      /\\[dDwWsS]/,      // 元字符转义
+      /\(\?:/,            // 非捕获组
+      /\^|\$/,            // 锚点
+    ];
+    
+    let regexFeatureCount = 0;
+    for (const pattern of regexPatterns) {
+      if (pattern.test(str)) {
+        regexFeatureCount++;
+      }
+    }
+    
+    // 如果包含 2 个或以上正则特征，认为是正则表达式
+    if (regexFeatureCount >= 2) {
+      return true;
+    }
+    
+    // 3. 包含大量转义字符（超过3个 \）
+    const escapeCount = (str.match(/\\/g) || []).length;
+    if (escapeCount > 3) {
+      return true;
+    }
+    
+    return false;
   }
 
   /**

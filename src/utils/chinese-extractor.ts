@@ -69,9 +69,14 @@ export class ChineseExtractor {
   }
 
   /**
-   * 检查是否为有效的中文文本（排除HTML标记等）
+   * 检查是否为有效的中文文本（排除HTML标记、正则表达式等）
    */
   private isValidChineseText(text: string): boolean {
+    // 排除正则表达式字面量
+    if (this.isRegexPattern(text)) {
+      return false;
+    }
+
     // 排除包含HTML标记的文本
     if (/<[^>]+>/.test(text) || /&\w+;/.test(text)) {
       return false;
@@ -416,6 +421,48 @@ export class ChineseExtractor {
     }
     
     return Array.from(chineseTexts);
+  }
+
+  /**
+   * 检查是否为正则表达式模式
+   * 正则中的中文通常是字符集匹配，不应国际化
+   */
+  private isRegexPattern(text: string): boolean {
+    // 检查是否以 / 开头和结尾（正则字面量格式）
+    if (/^\/.*\/$/.test(text) || /^\/.*\/[gimsuvy]*$/.test(text)) {
+      return true;
+    }
+
+    // 检查是否包含典型的正则表达式特征字符
+    const regexFeatures = [
+      /\[\^?[^\]]+\]/,           // 字符集 [a-z] [^abc]
+      /\(\?[:=!]/,                // 非捕获组、前瞻、后顾
+      /\{\d+,?\d*\}/,            // 量词 {n,m}
+      /\\[dDwWsS]/,              // 元字符
+      /[+*?]\??/,                 // 贪婪/非贪婪量词
+      /\|.*\|/,                   // 多选分支
+      /\^[^\s]/,                  // 开头锚点
+      /[^\s]\$/,                  // 结尾锚点
+    ];
+
+    // 如果包含多个正则特征，认为是正则表达式
+    let featureCount = 0;
+    for (const feature of regexFeatures) {
+      if (feature.test(text)) {
+        featureCount++;
+        if (featureCount >= 2) {
+          return true;
+        }
+      }
+    }
+
+    // 检查是否包含大量正则转义字符
+    const escapeCount = (text.match(/\\./g) || []).length;
+    if (escapeCount > 3) {
+      return true;
+    }
+
+    return false;
   }
 
   /**
