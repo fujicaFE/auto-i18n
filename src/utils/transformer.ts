@@ -290,23 +290,16 @@ export class Transformer {
           const inVueMethod = self.isInVueComponentContext(path) && !inData && !inProps;
 
           let callExpr: t.CallExpression;
-          if (inProps || inData) {
-            const callee = self.buildCalleeFromDotted(self.options.globalFunctionName || 'i18n.t');
-            callExpr = t.callExpression(callee, [t.stringLiteral(node.value)]);
-          } else if (inVueMethod) {
-            callExpr = t.callExpression(
-              t.memberExpression(t.thisExpression(), t.identifier(self.options.functionName || '$t')),
-              [t.stringLiteral(node.value)]
-            );
-          } else if (!looksLikeVueComponent) {
-            // 纯 JS 文件或非 Vue 组件上下文：统一使用全局 i18n.t
-            const callee = self.buildCalleeFromDotted(self.options.globalFunctionName || 'i18n.t');
-            callExpr = t.callExpression(callee, [t.stringLiteral(node.value)]);
+          const callee = self.buildCalleeFromDotted(self.options.globalFunctionName || 'window.$t');
+          callExpr = t.callExpression(callee, [t.stringLiteral(node.value)]);
+          
+          // 若在 props default 中，包装成箭头函数延迟执行（避免模块加载时 undefined）
+          if (inProps) {
+            const arrowFn = t.arrowFunctionExpression([], callExpr);
+            path.replaceWith(arrowFn);
           } else {
-            // Vue 但不在 methods/data/props default 中的普通脚本片段：使用 $t
-            callExpr = t.callExpression(t.identifier(self.options.functionName || '$t'), [t.stringLiteral(node.value)]);
+            path.replaceWith(callExpr);
           }
-          path.replaceWith(callExpr);
         },
         JSXAttribute(path: any) {
           const { node } = path;
@@ -318,21 +311,16 @@ export class Transformer {
           const inProps = self.isInPropsDefault(path);
           const inVueMethod = self.isInVueComponentContext(path) && !inData && !inProps;
           let callExpr: t.CallExpression;
-          if (inProps || inData) {
-            const callee = self.buildCalleeFromDotted(self.options.globalFunctionName || 'i18n.t');
-            callExpr = t.callExpression(callee, [t.stringLiteral(raw)]);
-          } else if (inVueMethod) {
-            callExpr = t.callExpression(
-              t.memberExpression(t.thisExpression(), t.identifier(self.options.functionName || '$t')),
-              [t.stringLiteral(raw)]
-            );
-          } else if (!looksLikeVueComponent) {
-            const callee = self.buildCalleeFromDotted(self.options.globalFunctionName || 'i18n.t');
-            callExpr = t.callExpression(callee, [t.stringLiteral(raw)]);
+          const callee = self.buildCalleeFromDotted(self.options.globalFunctionName || 'window.$t');
+          callExpr = t.callExpression(callee, [t.stringLiteral(raw)]);
+          
+          // 若在 props default 中，包装成箭头函数延迟执行
+          if (inProps) {
+            const arrowFn = t.arrowFunctionExpression([], callExpr);
+            node.value = t.jSXExpressionContainer(arrowFn);
           } else {
-            callExpr = t.callExpression(t.identifier(self.options.functionName || '$t'), [t.stringLiteral(raw)]);
+            node.value = t.jSXExpressionContainer(callExpr);
           }
-          node.value = t.jSXExpressionContainer(callExpr);
         },
         JSXText(path: any) {
           const text = path.node.value.trim();
@@ -341,21 +329,16 @@ export class Transformer {
           const inProps = self.isInPropsDefault(path);
           const inVueMethod = self.isInVueComponentContext(path) && !inData && !inProps;
           let callExpr: t.CallExpression;
-          if (inProps || inData) {
-            const callee = self.buildCalleeFromDotted(self.options.globalFunctionName || 'i18n.t');
-            callExpr = t.callExpression(callee, [t.stringLiteral(text)]);
-          } else if (inVueMethod) {
-            callExpr = t.callExpression(
-              t.memberExpression(t.thisExpression(), t.identifier(self.options.functionName || '$t')),
-              [t.stringLiteral(text)]
-            );
-          } else if (!looksLikeVueComponent) {
-            const callee = self.buildCalleeFromDotted(self.options.globalFunctionName || 'i18n.t');
-            callExpr = t.callExpression(callee, [t.stringLiteral(text)]);
+          const callee = self.buildCalleeFromDotted(self.options.globalFunctionName || 'window.$t');
+          callExpr = t.callExpression(callee, [t.stringLiteral(text)]);
+          
+          // 若在 props default 中，包装成箭头函数延迟执行
+          if (inProps) {
+            const arrowFn = t.arrowFunctionExpression([], callExpr);
+            path.replaceWith(t.jSXExpressionContainer(arrowFn));
           } else {
-            callExpr = t.callExpression(t.identifier(self.options.functionName || '$t'), [t.stringLiteral(text)]);
+            path.replaceWith(t.jSXExpressionContainer(callExpr));
           }
-          path.replaceWith(t.jSXExpressionContainer(callExpr));
         }
       });
 
@@ -472,7 +455,7 @@ export class Transformer {
   }
 
   /**
-   * 检查是否位于 data() 方法返回对象的上下文（此处需使用全局 i18n.t）
+   * 检查是否位于 data() 方法返回对象的上下文（此处需使用全局函数，如 window.$t）
    */
   private isInDataFunction(path: any): boolean {
     let parent = path.parentPath;

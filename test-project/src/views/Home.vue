@@ -148,7 +148,6 @@
 <script>
 import DemoComponent from '@/components/DemoComponent.vue'
 import I18nTest from '@/components/I18nTest.vue'
-import i18n from '../i18n'
 
 export default {
   name: 'Home',
@@ -159,19 +158,19 @@ export default {
   props: {
     placeholder: {
       type: String,
-      default: i18n.t('请输入车牌号码'),
+      default: () => window.$t('请输入车牌号码'),
     },
     teststr1: {
       type: String,
-      default: i18n.t('你好阿世界'),
+      default: () => window.$t('你好阿世界'),
     },
     tehaha: {
       type: String,
-      default: i18n.t('你好aa'),
+      default: () => window.$t('你好aa'),
     },
     sas: {
       type: String,
-      default: i18n.t('阿斯顿发送到'),
+      default: () => window.$t('阿斯顿发送到'),
     },
   },
   data() {

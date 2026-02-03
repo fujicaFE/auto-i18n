@@ -340,7 +340,7 @@ class AutoI18nPlugin {
     const { Transformer } = require('./utils/transformer')
     const transformer = new Transformer({
       functionName: '$t',
-      globalFunctionName: this.options.globalFunctionName || 'i18n.t',
+      globalFunctionName: this.options.globalFunctionName || 'window.$t',
       quotes: this.options.codeStyle?.quotes || 'single',
       semicolons: false
     })

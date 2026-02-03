@@ -12,7 +12,7 @@ module.exports = {
         include: ['src/**/*.vue', 'src/**/*.js'],
         exclude: [/\.min\.js$/, '/src/api/', '/src/apiV2/', 'src/locales/', '/src/settings.js', '/src/mixins/'],
         formatWithPrettier: true,
-        globalFunctionName: 'i18n.t',
+        globalFunctionName: 'window.$t',
       })
     ]
   }
