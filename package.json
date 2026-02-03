@@ -22,7 +22,7 @@
     "format": "prettier --write \"src/**/*.{ts,js,vue}\" \"test-project/src/**/*.{ts,js,vue}\"",
     "release": "node scripts/release.js",
     "rel": "npm run release",
-    "pub:patch": "node scripts/release.js --bump=patch",
+    "pub:patch": "node scripts/release.js --bump=patch --allow-dirty",
     "pub:minor": "node scripts/release.js --bump=minor",
     "pub:major": "node scripts/release.js --bump=major",
     "pub:set": "node scripts/release.js --set-version",

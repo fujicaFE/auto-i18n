@@ -1,0 +1,1753 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>中文提取报告 - Auto i18n</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+    }
+
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 40px;
+      text-align: center;
+    }
+
+    .header h1 {
+      font-size: 32px;
+      margin-bottom: 10px;
+      font-weight: 700;
+    }
+
+    .header p {
+      font-size: 14px;
+      opacity: 0.9;
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 20px;
+      padding: 40px;
+      background: #f8f9fa;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .stat-card {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      border-left: 4px solid #667eea;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    }
+
+    .stat-card h3 {
+      font-size: 12px;
+      color: #666;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    .stat-card .number {
+      font-size: 32px;
+      font-weight: 700;
+      color: #667eea;
+    }
+
+    .stat-card.ast-card {
+      border-left-color: #667eea;
+    }
+
+    .stat-card.regex-card {
+      border-left-color: #f093fb;
+    }
+
+    .stat-card.total-card {
+      border-left-color: #764ba2;
+    }
+
+    .content {
+      padding: 40px;
+    }
+
+    .section {
+      margin-bottom: 40px;
+    }
+
+    .section h2 {
+      font-size: 20px;
+      color: #333;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 2px solid #667eea;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-icon {
+      font-size: 24px;
+    }
+
+    .table-wrapper {
+      overflow-x: auto;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 14px;
+    }
+
+    thead {
+      background: #f5f5f5;
+    }
+
+    th {
+      padding: 12px 16px;
+      text-align: left;
+      font-weight: 600;
+      color: #333;
+      border-bottom: 2px solid #e0e0e0;
+    }
+
+    td {
+      padding: 12px 16px;
+      border-bottom: 1px solid #e0e0e0;
+      word-break: break-word;
+    }
+
+    tbody tr:hover {
+      background: #f9f9f9;
+    }
+
+    tbody tr:nth-child(odd) {
+      background: #fafafa;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .badge-ast {
+      background: #e3f2fd;
+      color: #1976d2;
+    }
+
+    .badge-regex {
+      background: #f3e5f5;
+      color: #7b1fa2;
+    }
+
+    .category-badge {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 4px;
+      font-size: 12px;
+      background: #e0e0e0;
+      color: #555;
+      margin-right: 8px;
+    }
+
+    .empty-message {
+      text-align: center;
+      padding: 40px;
+      color: #999;
+      font-size: 14px;
+    }
+
+    .footer {
+      background: #f5f5f5;
+      padding: 20px;
+      text-align: center;
+      color: #999;
+      font-size: 12px;
+      border-top: 1px solid #e0e0e0;
+    }
+
+    .progress-bar {
+      display: flex;
+      gap: 4px;
+      margin-top: 8px;
+      height: 4px;
+      background: #e0e0e0;
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .progress-segment {
+      height: 100%;
+      border-radius: 2px;
+    }
+
+    .progress-ast {
+      background: #667eea;
+      flex: var(--ast-ratio);
+    }
+
+    .progress-regex {
+      background: #f093fb;
+      flex: var(--regex-ratio);
+    }
+
+    @media (max-width: 768px) {
+      .stats {
+        grid-template-columns: 1fr;
+      }
+
+      .header {
+        padding: 20px;
+      }
+
+      .header h1 {
+        font-size: 24px;
+      }
+
+      .content {
+        padding: 20px;
+      }
+
+      table {
+        font-size: 12px;
+      }
+
+      th, td {
+        padding: 8px 12px;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🌐 中文提取分析报告</h1>
+      <p>Auto i18n 插件生成 | 2026/2/3 16:52:26</p>
+    </div>
+
+    <div class="stats">
+      <div class="stat-card total-card">
+        <h3>总提取数量</h3>
+        <div class="number">290</div>
+      </div>
+      <div class="stat-card ast-card">
+        <h3>AST 识别</h3>
+        <div class="number">290</div>
+        <div class="progress-bar">
+          <div class="progress-segment progress-ast" style="--ast-ratio: 290; --regex-ratio: 0"></div>
+          <div class="progress-segment progress-regex"></div>
+        </div>
+      </div>
+      <div class="stat-card regex-card">
+        <h3>正则匹配</h3>
+        <div class="number">0</div>
+      </div>
+    </div>
+
+    <div class="content">
+      <div class="section">
+      <h2>✨ AST 方式提取 <span style="font-size: 14px; color: #999; font-weight: 400;">(290 项)</span></h2>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 10%;">来源</th>
+              <th style="width: 15%;">分类</th>
+              <th style="width: 75%;">中文文本</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>语言已切换到:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>欢迎使用自动国际化插件！</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>应用已启动</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请输入车牌号码</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>你好阿世界</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>你好aa</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>阿斯顿发送到</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>这是一个演示弹窗，展示中文文本的自动国际化！</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请填写完整的登录信息</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>登录成功啦</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>用户登录:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请先输入用户名</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>注册功能开发中...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>表单已重置</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>首页组件已加载</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>正在加载项目统计数据...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>技术详情：基于Babel AST解析，支持Vue SFC和JavaScript文件处理</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>关于页面已加载</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>正在发送消息...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>消息发送成功！谢谢您的反馈。</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>发送失败，请稍后重试。</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>发送错误:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请输入您的姓名</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请输入您的邮箱地址</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请输入有效的邮箱地址</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请输入消息内容</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>表单已重置</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>消息发送模拟完成</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>即将跳转到文档页面...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>打开文档</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>即将跳转到GitHub仓库...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>打开GitHub</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>即将跳转到Issues页面...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>打开Issues</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>常见问题页面开发中...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>使用教程页面开发中...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>示例代码页面开发中...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>联系页面已加载</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>语言已切换到:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>欢迎使用自动国际化插件！</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>应用已启动</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>这是一个测试消息</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">TemplateLiteral</span></td>
+              <td><strong>您点击了:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>按钮操作:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>早上好！</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>下午好！</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>晚上好！</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>演示组件已挂载</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>演示组件即将销毁</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>测试翻译:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>首页 =&gt;</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>首页</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>关于 =&gt;</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>关于</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>联系我们 =&gt;</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>联系我们</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">TemplateLiteral</span></td>
+              <td><strong>当前语言:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">TemplateLiteral</span></td>
+              <td><strong>首页翻译:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>首页</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>邮箱格式不正确</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>手机号格式不正确</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>此字段为必填项</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">TemplateLiteral</span></td>
+              <td><strong>至少需要</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">TemplateLiteral</span></td>
+              <td><strong>个字符</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">TemplateLiteral</span></td>
+              <td><strong>最多允许</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">TemplateLiteral</span></td>
+              <td><strong>个字符</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>成功:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">TemplateLiteral</span></td>
+              <td><strong>成功:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>错误:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">TemplateLiteral</span></td>
+              <td><strong>错误:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>警告:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">TemplateLiteral</span></td>
+              <td><strong>警告:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>信息:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">TemplateLiteral</span></td>
+              <td><strong>信息:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>数据已保存到本地存储</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>保存到本地存储失败:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>保存数据失败</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>从本地存储读取数据失败:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>读取数据失败</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>数据已从本地存储移除</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>从本地存储移除数据失败:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>删除数据失败</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>本地存储已清空</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>本地存储已清空</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>清空本地存储失败:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>清空存储失败</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>发起GET请求:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>模拟数据</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请求成功</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>GET请求失败:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>网络请求失败</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>发起POST请求:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>提交成功</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>POST请求失败:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>提交数据失败</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>待处理</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>处理中</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>已完成</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>失败</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>已取消</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>管理员</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>普通用户</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>访客</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>保存成功</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>删除成功</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>更新成功</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>操作失败</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>暂无数据</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>加载中...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>确认删除这条记录吗？</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>确认要退出登录吗？</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>正在加载项目统计数据...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>技术详情：基于Babel AST解析，支持Vue SFC和JavaScript文件处理</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>关于页面已加载</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>正在发送消息...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>消息发送成功！谢谢您的反馈。</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>发送失败，请稍后重试。</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>发送错误:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请输入您的姓名</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请输入您的邮箱地址</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请输入有效的邮箱地址</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请输入消息内容</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>表单已重置</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>消息发送模拟完成</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>即将跳转到文档页面...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>打开文档</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>即将跳转到GitHub仓库...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>打开GitHub</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>即将跳转到Issues页面...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>打开Issues</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>常见问题页面开发中...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>使用教程页面开发中...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>示例代码页面开发中...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>联系页面已加载</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请输入车牌号码</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>你好阿世界</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>你好aa</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>阿斯顿发送到</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>这是一个演示弹窗，展示中文文本的自动国际化！</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请填写完整的登录信息</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>登录成功啦</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>用户登录:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请先输入用户名</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>注册功能开发中...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>表单已重置</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>首页组件已加载</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>系统配置</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请输入</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请输入正整数</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>尊敬的用户，您享用的XXX服务将于YYYY-YY-YY到期，为了不影响您的使用，建议您提前办理服务续期</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>限制</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>的正整数</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请上传.png格式图片，最大支持 500KB</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请上传.png/.jpg/.jpeg格式图片，最大支持 2MB</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>/^(([京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领][A-Z](([0-9]{5}[A-Z])|([A-Z]([A-HJ-NP-Z0-9])[0-9]{4})))|([虚无]([A-Z0-9]{6}))|([M]([0-9]{4}))|([M]([A-Z]{1}[0-9]{4}))|([京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领][A-Z][A-HJ-NP-Z0-9]{4}[A-HJ-NP-Z0-9挂学警港澳使领])|(WJ[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼0-9A-Z]{1}[0-9]{4}[TDSHBXJ0-9]{1}))$/</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>这是一个测试消息</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">TemplateLiteral</span></td>
+              <td><strong>您点击了:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>按钮操作:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>早上好！</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>下午好！</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>晚上好！</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>演示组件已挂载</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>演示组件即将销毁</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>测试翻译:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>首页 =&gt;</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>首页</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>关于 =&gt;</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>关于</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>联系我们 =&gt;</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>联系我们</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">TemplateLiteral</span></td>
+              <td><strong>当前语言:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">TemplateLiteral</span></td>
+              <td><strong>首页翻译:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>首页</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>语言已切换到:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>欢迎使用自动国际化插件！</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>应用已启动</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>这是一个测试消息</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">TemplateLiteral</span></td>
+              <td><strong>您点击了:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>按钮操作:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>早上好！</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>下午好！</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>晚上好！</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>演示组件已挂载</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>演示组件即将销毁</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>测试翻译:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>首页 =&gt;</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>首页</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>关于 =&gt;</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>关于</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>联系我们 =&gt;</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>联系我们</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">TemplateLiteral</span></td>
+              <td><strong>当前语言:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">TemplateLiteral</span></td>
+              <td><strong>首页翻译:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>首页</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>邮箱格式不正确</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>手机号格式不正确</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>此字段为必填项</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">TemplateLiteral</span></td>
+              <td><strong>至少需要</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">TemplateLiteral</span></td>
+              <td><strong>个字符</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">TemplateLiteral</span></td>
+              <td><strong>最多允许</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">TemplateLiteral</span></td>
+              <td><strong>个字符</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>成功:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">TemplateLiteral</span></td>
+              <td><strong>成功:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>错误:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">TemplateLiteral</span></td>
+              <td><strong>错误:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>警告:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">TemplateLiteral</span></td>
+              <td><strong>警告:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>信息:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">TemplateLiteral</span></td>
+              <td><strong>信息:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>数据已保存到本地存储</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>保存到本地存储失败:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>保存数据失败</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>从本地存储读取数据失败:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>读取数据失败</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>数据已从本地存储移除</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>从本地存储移除数据失败:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>删除数据失败</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>本地存储已清空</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>本地存储已清空</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>清空本地存储失败:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>清空存储失败</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>发起GET请求:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>模拟数据</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请求成功</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>GET请求失败:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>网络请求失败</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>发起POST请求:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>提交成功</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>POST请求失败:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>提交数据失败</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>待处理</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>处理中</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>已完成</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>失败</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>已取消</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>管理员</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>普通用户</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>访客</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>保存成功</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>删除成功</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>更新成功</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>操作失败</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>暂无数据</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>加载中...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>确认删除这条记录吗？</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>确认要退出登录吗？</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>正在加载项目统计数据...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>技术详情：基于Babel AST解析，支持Vue SFC和JavaScript文件处理</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>关于页面已加载</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>正在发送消息...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>消息发送成功！谢谢您的反馈。</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>发送失败，请稍后重试。</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>发送错误:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请输入您的姓名</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请输入您的邮箱地址</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请输入有效的邮箱地址</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请输入消息内容</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>表单已重置</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>消息发送模拟完成</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>即将跳转到文档页面...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>打开文档</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>即将跳转到GitHub仓库...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>打开GitHub</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>即将跳转到Issues页面...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>打开Issues</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>常见问题页面开发中...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>使用教程页面开发中...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>示例代码页面开发中...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>联系页面已加载</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请输入车牌号码</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>你好阿世界</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>你好aa</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>阿斯顿发送到</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>这是一个演示弹窗，展示中文文本的自动国际化！</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请填写完整的登录信息</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>登录成功啦</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>用户登录:</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请先输入用户名</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>注册功能开发中...</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>表单已重置</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>首页组件已加载</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>系统配置</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请输入</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请输入正整数</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>尊敬的用户，您享用的XXX服务将于YYYY-YY-YY到期，为了不影响您的使用，建议您提前办理服务续期</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>限制</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>的正整数</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请上传.png格式图片，最大支持 500KB</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>请上传.png/.jpg/.jpeg格式图片，最大支持 2MB</strong></td>
+            </tr>
+            <tr>
+              <td><span class="badge badge-ast">AST</span></td>
+              <td><span class="category-badge">StringLiteral</span></td>
+              <td><strong>/^(([京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领][A-Z](([0-9]{5}[A-Z])|([A-Z]([A-HJ-NP-Z0-9])[0-9]{4})))|([虚无]([A-Z0-9]{6}))|([M]([0-9]{4}))|([M]([A-Z]{1}[0-9]{4}))|([京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼使领][A-Z][A-HJ-NP-Z0-9]{4}[A-HJ-NP-Z0-9挂学警港澳使领])|(WJ[京津沪渝冀豫云辽黑湘皖鲁新苏浙赣鄂桂甘晋蒙陕吉闽贵粤青藏川宁琼0-9A-Z]{1}[0-9]{4}[TDSHBXJ0-9]{1}))$/</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+      
+      
+    </div>
+
+    <div class="footer">
+      <p>📊 报告生成于 文件: src\locales\.extraction-reports\extraction-report-2026-02-03T08-52-26-246Z.html</p>
+      <p>自动国际化插件 © 2024 Auto i18n</p>
+    </div>
+  </div>
+</body>
+</html>
