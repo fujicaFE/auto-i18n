@@ -308,4 +308,38 @@ describe('LocaleFileManager', () => {
       expect(manager['translations'].get('你好')).toEqual({ en: 'Hello', 'zh-TW': '你好' })
     })
   })
+
+  describe('getTranslationMap', () => {
+    test('should return translations in transformation format', () => {
+      // 直接设置内存中的翻译
+      manager['translations'].set('你好', { en: 'Hello', 'zh-TW': '你好' })
+      manager['translations'].set('世界', { en: 'World', 'zh-TW': '世界' })
+
+      const result = manager.getTranslationMap()
+
+      expect(result).toEqual({
+        '你好': { en: 'Hello', 'zh-TW': '你好' },
+        '世界': { en: 'World', 'zh-TW': '世界' }
+      })
+    })
+
+    test('should return empty object when no translations loaded', () => {
+      const result = manager.getTranslationMap()
+      expect(result).toEqual({})
+    })
+
+    test('should reflect updates after addTranslations', () => {
+      const translations: Translation[] = [
+        {
+          source: '测试',
+          translations: { en: 'Test', 'zh-TW': '測試' }
+        }
+      ]
+
+      manager.addTranslations(translations)
+      const result = manager.getTranslationMap()
+
+      expect(result['测试']).toEqual({ en: 'Test', 'zh-TW': '測試' })
+    })
+  })
 })

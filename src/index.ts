@@ -2,7 +2,6 @@ import path from 'path'
 import { ChineseExtractor } from './utils/chinese-extractor'
 import { TranslationService } from './utils/translation-service'
 import { LocaleFileManager } from './utils/locale-file-manager'
-import { FilePreprocessor } from './utils/file-preprocessor'
 import { AutoI18nPluginOptions, Translation } from './types'
 
 /**
@@ -42,7 +41,6 @@ class AutoI18nPlugin {
   translationService: TranslationService
   localeFileManager: LocaleFileManager
   chineseExtractor: ChineseExtractor
-  filePreprocessor: FilePreprocessor
 
   // ============ 内部状态 ============
   /** 收集到的中文文本集合 */
@@ -139,15 +137,6 @@ class AutoI18nPlugin {
     // 配置日志系统
     this.logLevel = this.options.logLevel || 'verbose'
     const summaryOnly = this.logLevel !== 'verbose'
-
-    // 初始化文件预处理器
-    this.filePreprocessor = new FilePreprocessor(
-      this.chineseExtractor,
-      this.options.codeStyle,
-      this.logLevel,
-      this.logLevel === 'verbose',
-      summaryOnly
-    )
 
     this.logThrottleMs = this.options.logThrottleMs ?? 5000
   }
@@ -318,8 +307,9 @@ class AutoI18nPlugin {
     if (!this.options.transformCode) return
     if (this.pluginDisabled) return
 
-    // 加载最新翻译映射
-    const translationsMap = this.loadTranslationsFromMemory()
+    // 加载最新翻译映射（先加载缓存，再获取映射格式）
+    await this.localeFileManager.loadTranslations()
+    const translationsMap = this.localeFileManager.getTranslationMap()
 
     // 依赖注入
     const fs = require('fs')
@@ -634,56 +624,6 @@ class AutoI18nPlugin {
       'summary',
       `Vue files scanned=${this.metrics.scannedVue} updated=${this.metrics.updatedVue} skipped=${this.metrics.skippedVue} chinese=${this.metrics.chineseVue} newKeys=${this.metrics.newKeys} totalKeys=${totalKeys}`
     )
-  }
-
-  /**
-   * 从内存加载已有的翻译映射
-   * 从输出目录读取所有 JSON 语言文件，构建中英文映射
-   * @returns 翻译映射对象 { source: { locale: translation } }
-   */
-  /**
-   * 从内存加载已有的翻译映射
-   * 从输出目录读取所有 JSON 语言文件，构建中英文映射
-   * @returns 翻译映射对象 { source: { locale: translation } }
-   */
-  private loadTranslationsFromMemory(): { [key: string]: { [locale: string]: string } } {
-    const translations: { [key: string]: { [locale: string]: string } } = {}
-
-    try {
-      const fs = require('fs')
-      const localesDir = path.resolve(this.options.outputPath)
-
-      if (!fs.existsSync(localesDir)) {
-        return translations
-      }
-
-      // 读取所有 JSON 语言文件
-      const files = fs.readdirSync(localesDir).filter((file: string) => file.endsWith('.json'))
-
-      for (const file of files) {
-        const locale = path.basename(file, '.json')
-        const filePath = path.join(localesDir, file)
-
-        try {
-          const content = fs.readFileSync(filePath, 'utf-8')
-          const localeTranslations = JSON.parse(content)
-
-          // 合并到翻译映射
-          for (const [key, translation] of Object.entries(localeTranslations)) {
-            if (!translations[key]) {
-              translations[key] = {}
-            }
-            translations[key][locale] = translation as string
-          }
-        } catch (error) {
-          console.warn('AutoI18nPlugin: Failed to load', filePath)
-        }
-      }
-    } catch (error) {
-      console.warn('AutoI18nPlugin: Failed to load translations:', error.message)
-    }
-
-    return translations
   }
 
   /**

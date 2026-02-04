@@ -223,4 +223,17 @@ export class LocaleFileManager {
   getTotalKeyCount(): number {
     return this.translations.size;
   }
+
+  /**
+   * 获取转换用的翻译映射格式
+   * 将内存中缓存的翻译转换为 { source: { locale: translation } } 格式
+   * @returns 翻译映射对象
+   */
+  getTranslationMap(): { [key: string]: { [locale: string]: string } } {
+    const translationsMap: { [key: string]: { [locale: string]: string } } = {}
+    for (const [source, record] of this.translations.entries()) {
+      translationsMap[source] = record
+    }
+    return translationsMap
+  }
 }
